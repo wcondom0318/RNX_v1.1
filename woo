@@ -3090,7 +3090,7 @@ InfoTab:CreateParagraph({
 
 	ManualTab:CreateSection("플레이어 탭 기능")
 	ManualTab:CreateParagraph({
-		Title = "ESP / 에임락 / 벽통과 / 투명화 / 텔레포트 / 리스폰 / 서버 재입장 / 3인칭 / 헤드리스 / 코블록스 / 텔레포트 툴 / 좌표저장복귀 / 전장복귀",
+		Title = "ESP / 에임락 / 벽통과 / 투명화 / 텔레포트 / 리스폰 / 서버 재입장 / 3인칭 / 헤드리스 / 코블록스 / 텔레포트 툴 / 좌표저장복귀 / 리스폰",
 		Content =
 			"\n1. ESP\n" ..
 			"- 전체 표시 ON/OFF\n" ..
