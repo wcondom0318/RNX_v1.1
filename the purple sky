@@ -1,0 +1,72 @@
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+
+local customSkyEnabled = false
+local originalSky = nil
+local customSky = nil
+
+local skyAssets = {
+    Bk = "rbxassetid://5084575798",
+    Dn = "rbxassetid://5084575916",
+    Ft = "rbxassetid://5103949679",
+    Lf = "rbxassetid://5103948542",
+    Rt = "rbxassetid://5103948784",
+    Up = "rbxassetid://5084576400"
+}
+
+local function applyCustomSky()
+    for _, v in pairs(Lighting:GetChildren()) do
+        if v:IsA("Sky") then
+            originalSky = v
+            v.Parent = nil
+        end
+    end
+
+    customSky = Instance.new("Sky")
+    customSky.Name = "CustomSky"
+    customSky.SkyboxBk = skyAssets.Bk
+    customSky.SkyboxDn = skyAssets.Dn
+    customSky.SkyboxFt = skyAssets.Ft
+    customSky.SkyboxLf = skyAssets.Lf
+    customSky.SkyboxRt = skyAssets.Rt
+    customSky.SkyboxUp = skyAssets.Up
+    customSky.SunAngularSize = 0
+    customSky.MoonAngularSize = 0
+    customSky.Parent = Lighting
+
+    Lighting.Ambient = Color3.fromRGB(150, 150, 150)
+    Lighting.OutdoorAmbient = Color3.fromRGB(100, 100, 100)
+end
+
+local function removeCustomSky()
+    if customSky then
+        customSky:Destroy()
+        customSky = nil
+    end
+
+    if originalSky then
+        originalSky.Parent = Lighting
+        originalSky = nil
+    end
+
+    Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+    Lighting.OutdoorAmbient = Color3.fromRGB(127, 127, 127)
+end
+
+local function toggleCustomSky()
+    customSkyEnabled = not customSkyEnabled
+
+    if customSkyEnabled then
+        applyCustomSky()
+    else
+        removeCustomSky()
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == Enum.KeyCode.Period then
+        toggleCustomSky()
+    end
+end)
