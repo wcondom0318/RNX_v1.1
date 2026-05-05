@@ -1,0 +1,1000 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
+
+-- ════════════════════════════════════════════════════════════
+-- 0. Anticheat Bypass (안티치트 우회)
+-- ════════════════════════════════════════════════════════════
+task.spawn(function()
+    pcall(function()
+        local rf = game:GetService("ReplicatedFirst")
+        local lp = Players.LocalPlayer
+
+        local fake = Instance.new("RemoteEvent")
+        fake.Name = "ClientAlert"
+        fake.Parent = lp
+
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            local m = getnamecallmethod()
+            if not checkcaller() then
+                if m == "WaitForChild" and select(1, ...) == "ClientAlert" then return fake end
+                if self == lp and (m == "Kick" or m == "kick") then return end
+                if m:lower():find("kick") or m == "Shutdown" then return end
+                if m == "FireServer" and self == fake then return end
+            end
+            return oldNamecall(self, ...)
+        end)
+
+        local ls3 = rf:WaitForChild("LocalScript3", 10)
+        for _, f in getgc(false) do
+            if typeof(f) == "function" then
+                local ok, e = pcall(getfenv, f)
+                if ok and e then
+                    local scr = rawget(e, "script")
+                    if scr and (scr == ls3 or tostring(scr):find("LoadingScreen")) then
+                        local ok2, cs = pcall(debug.getconstants, f)
+                        if ok2 then
+                            for _, k in cs do
+                                if typeof(k) == "string" and (k:find("TakeTheL") or k:find("ban") or k:find("kick")) then
+                                    hookfunction(f, function() end)
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+-- ════════════════════════════════════════════════════════════
+-- 1. UI 라이브러리 로드
+-- ════════════════════════════════════════════════════════════
+local repo = "https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Window = Library:CreateWindow({ Title = '안티 허브 ㅣ Anti hub', Center = true, AutoShow = true })
+
+local Tabs = {
+    Combat = Window:AddTab('Combat'),
+    Visual = Window:AddTab('Visual'),
+    Misc = Window:AddTab('MISC'),
+    Settings = Window:AddTab('Settings')
+}
+
+-- [Combat Tab]
+local AimbotBox = Tabs.Combat:AddLeftGroupbox('Aimbot')
+AimbotBox:AddToggle('AimEnable', { Text = '에임봇 켜기', Default = false })
+AimbotBox:AddToggle('AimRightClick', { Text = '우클릭 전용 작동', Default = true })
+AimbotBox:AddSlider('AimSmooth', { Text = '에임 부드러움', Default = 0.5, Min = 0.1, Max = 1, Rounding = 1 })
+
+local SilentBox = Tabs.Combat:AddRightGroupbox('Silent Aim')
+SilentBox:AddToggle('SilentEnable', { Text = '사일런트 에임 (유도탄)', Default = false })
+SilentBox:AddToggle('Wallbang', { Text = '매직 불릿 (Front Desync)', Default = false })
+SilentBox:AddSlider('BulletSpeed', { Text = '총알 속도', Default = 1, Min = 1, Max = 10, Rounding = 1 })
+SilentBox:AddSlider('DesyncDist', { Text = '매직불릿 거리 (상대 앞)', Default = 3, Min = 1, Max = 10, Rounding = 1 })
+SilentBox:AddSlider('SilentFOV', { Text = '타겟 인식 범위 (FOV)', Default = 150, Min = 10, Max = 1000, Rounding = 0 })
+SilentBox:AddToggle('DrawFOV', { Text = 'FOV 원 표시 (Draw FOV)', Default = false }):AddColorPicker('FOVColor', { Default = Color3.new(1, 1, 1), Title = 'FOV 색상' })
+
+local RageBox = Tabs.Combat:AddLeftGroupbox('Rage')
+RageBox:AddToggle('RageEnable', { Text = '레이지봇 (자동발사)', Default = false })
+
+-- [Visual Tab]
+local ESPBox = Tabs.Visual:AddLeftGroupbox('ESP Features')
+ESPBox:AddToggle('ESPBox', { Text = '박스 (Box)', Default = false })
+ESPBox:AddToggle('ESPSkeleton', { Text = '스켈레톤 (Skeleton)', Default = false })
+ESPBox:AddToggle('ESPHealth', { Text = '체력바 (Health Bar)', Default = false })
+ESPBox:AddToggle('ESPName', { Text = '이름 표시 (Name)', Default = false })
+ESPBox:AddToggle('ESPDistance', { Text = '거리 표시 (Distance)', Default = false })
+ESPBox:AddToggle('ESPTracer', { Text = '트레이서 (Tracers)', Default = false })
+ESPBox:AddToggle('ESPChams', { Text = '챔스 (색칠 투시)', Default = false })
+
+-- [MISC Tab]
+local MovementBox = Tabs.Misc:AddLeftGroupbox('Movement')
+MovementBox:AddToggle('FlyEnable', { Text = '플라이 (Fly)', Default = false })
+MovementBox:AddSlider('FlySpeed', { Text = '비행 속도', Default = 50, Min = 10, Max = 200, Rounding = 0 })
+MovementBox:AddToggle('NoclipEnable', { Text = '노클립 (Noclip - 벽뚫기)', Default = false })
+MovementBox:AddToggle('InfJumpEnable', { Text = '무한 점프 (Inf Jump)', Default = false })
+MovementBox:AddToggle('WalkSpeedEnable', { Text = '이속 증가 (WalkSpeed)', Default = false })
+MovementBox:AddSlider('WalkSpeedValue', { Text = '이속 값', Default = 16, Min = 16, Max = 200, Rounding = 0 })
+MovementBox:AddToggle('JumpPowerEnable', { Text = '점프력 증가 (JumpPower)', Default = false })
+MovementBox:AddSlider('JumpPowerValue', { Text = '점프력 값', Default = 50, Min = 50, Max = 300, Rounding = 0 })
+
+local WeaponBox = Tabs.Misc:AddRightGroupbox('Weapon')
+WeaponBox:AddToggle('RapidEnable', { Text = '래피드 파이어 (Rapid Fire)', Default = false })
+WeaponBox:AddSlider('RapidSpeed', { Text = '연사 속도', Default = 5, Min = 1, Max = 20, Rounding = 0 })
+
+local SkinBox = Tabs.Misc:AddRightGroupbox('Skin Changer (스킨 체인저)')
+SkinBox:AddButton('스킨 언락 (Unlock All)', function()
+    task.spawn(function()
+        pcall(function()
+            if getgenv().SkinChangerLoaded then 
+                Library:Notify("스킨 체인저가 이미 작동 중입니다.", 2)
+                return 
+            end
+            getgenv().SkinChangerLoaded = true
+
+            local scriptString = [=[
+local plrs = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local player = plrs.LocalPlayer
+local playerScripts = player:WaitForChild("PlayerScripts")
+local controllers = playerScripts:WaitForChild("Controllers")
+
+local EnumLibrary, CosmeticLibrary, ItemLibrary, DataController
+pcall(function() EnumLibrary = require(ReplicatedStorage.Modules:WaitForChild("EnumLibrary", 10)) end)
+if EnumLibrary and EnumLibrary.WaitForEnumBuilder then pcall(function() EnumLibrary:WaitForEnumBuilder() end) end
+pcall(function() CosmeticLibrary = require(ReplicatedStorage.Modules:WaitForChild("CosmeticLibrary", 10)) end)
+pcall(function() ItemLibrary = require(ReplicatedStorage.Modules:WaitForChild("ItemLibrary", 10)) end)
+pcall(function() DataController = require(controllers:WaitForChild("PlayerDataController", 10)) end)
+
+if not (CosmeticLibrary and ItemLibrary and DataController) then return end
+
+local equipped, favorites = {}, {}
+local constructingWeapon, viewingProfile = nil, nil
+local lastUsedWeapon = nil
+
+-- 리모트 캐싱 (성능 최적화)
+local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+local dataRemotes = remotes and remotes:WaitForChild("Data", 5)
+local equipRemote = dataRemotes and dataRemotes:WaitForChild("EquipCosmetic", 5)
+local favoriteRemote = dataRemotes and dataRemotes:WaitForChild("FavoriteCosmetic", 5)
+local replicationRemotes = remotes and remotes:WaitForChild("Replication", 5)
+local fighterRemotes = replicationRemotes and replicationRemotes:WaitForChild("Fighter", 5)
+local useItemRemote = fighterRemotes and fighterRemotes:WaitForChild("UseItem", 5)
+
+local function cloneCosmetic(name, cosmeticType, options)
+    local base = CosmeticLibrary.Cosmetics[name]
+    if not base then return nil end
+    local data = {}
+    for key, value in pairs(base) do data[key] = value end
+    data.Name = name
+    data.Type = data.Type or cosmeticType
+    data.Seed = data.Seed or math.random(1, 1000000)
+    if EnumLibrary then
+        local success, enumId = pcall(EnumLibrary.ToEnum, EnumLibrary, name)
+        if success and enumId then data.Enum, data.ObjectID = enumId, data.ObjectID or enumId end
+    end
+    if options then
+        if options.inverted ~= nil then data.Inverted = options.inverted end
+        if options.favoritesOnly ~= nil then data.OnlyUseFavorites = options.favoritesOnly end
+    end
+    return data
+end
+
+CosmeticLibrary.OwnsCosmeticNormally = function() return true end
+CosmeticLibrary.OwnsCosmeticUniversally = function() return true end
+CosmeticLibrary.OwnsCosmeticForWeapon = function() return true end
+local originalOwnsCosmetic = CosmeticLibrary.OwnsCosmetic
+CosmeticLibrary.OwnsCosmetic = function(self, inventory, name, weapon)
+    if name and typeof(name) == "string" and name:find("MISSING_") then return originalOwnsCosmetic(self, inventory, name, weapon) end
+    return true
+end
+
+local originalGet = DataController.Get
+DataController.Get = function(self, key)
+    local data = originalGet(self, key)
+    if key == "CosmeticInventory" then
+        local proxy = {}
+        if data then for k, v in pairs(data) do proxy[k] = v end end
+        return setmetatable(proxy, {__index = function() return true end})
+    end
+    if key == "FavoritedCosmetics" then
+        local result = data and table.clone(data) or {}
+        for weapon, favs in pairs(favorites) do
+            result[weapon] = result[weapon] or {}
+            for name, isFav in pairs(favs) do result[weapon][name] = isFav end
+        end
+        return result
+    end
+    return data
+end
+
+local originalGetWeaponData = DataController.GetWeaponData
+DataController.GetWeaponData = function(self, weaponName)
+    local data = originalGetWeaponData(self, weaponName)
+    if not data then return nil end
+    local merged = {}
+    for key, value in pairs(data) do merged[key] = value end
+    merged.Name = weaponName
+    if equipped[weaponName] then
+        for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do merged[cosmeticType] = cosmeticData end
+    end
+    return merged
+end
+
+local FighterController
+pcall(function() FighterController = require(controllers:WaitForChild("FighterController", 10)) end)
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    if method ~= "FireServer" or checkcaller() then return oldNamecall(self, ...) end
+    local args = {...}
+    
+    if useItemRemote and self == useItemRemote then
+        local objectID = args[1]
+        if FighterController then
+            pcall(function()
+                local fighter = FighterController:GetFighter(player)
+                if fighter and typeof(fighter) == "table" and fighter.Items then
+                    for _, item in pairs(fighter.Items) do
+                        if type(item) == "table" and item.Get then
+                            if item:Get("ObjectID") == objectID then
+                                lastUsedWeapon = item.Name
+                                break
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end            
+    
+    if equipRemote and self == equipRemote then
+        local weaponName, cosmeticType, cosmeticName, options = args[1], args[2], args[3], args[4] or {}                
+        if cosmeticName and cosmeticName ~= "None" and cosmeticName ~= "" then
+            local inventory = DataController:Get("CosmeticInventory")
+            if inventory and rawget(inventory, cosmeticName) then return oldNamecall(self, ...) end
+        end                
+        equipped[weaponName] = equipped[weaponName] or {}                
+        if not cosmeticName or cosmeticName == "None" or cosmeticName == "" then
+            equipped[weaponName][cosmeticType] = nil
+            if not next(equipped[weaponName]) then equipped[weaponName] = nil end
+        else
+            local cloned = cloneCosmetic(cosmeticName, cosmeticType, {inverted = options.IsInverted, favoritesOnly = options.OnlyUseFavorites})
+            if cloned then equipped[weaponName][cosmeticType] = cloned end
+        end                
+        task.defer(function()
+            pcall(function() DataController.CurrentData:Replicate("WeaponInventory") end)
+        end)
+        return
+    end            
+    
+    if favoriteRemote and self == favoriteRemote then
+        favorites[args[1]] = favorites[args[1]] or {}
+        favorites[args[1]][args[2]] = args[3] or nil
+        task.spawn(function() pcall(function() DataController.CurrentData:Replicate("FavoritedCosmetics") end) end)
+        return
+    end            
+    return oldNamecall(self, ...)
+end)
+
+local ClientItem
+pcall(function() ClientItem = require(player.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem) end)
+if ClientItem and type(ClientItem) == "table" and ClientItem._CreateViewModel then
+    local originalCreateViewModel = ClientItem._CreateViewModel
+    ClientItem._CreateViewModel = function(self, viewmodelRef)
+        local weaponName = self.Name
+        local weaponPlayer = self.ClientFighter and self.ClientFighter.Player
+        constructingWeapon = (weaponPlayer == player) and weaponName or nil    
+        pcall(function()
+            if weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Skin and viewmodelRef then
+                local dataKey, skinKey, nameKey = self:ToEnum("Data"), self:ToEnum("Skin"), self:ToEnum("Name")
+                if viewmodelRef[dataKey] then
+                    viewmodelRef[dataKey][skinKey] = equipped[weaponName].Skin
+                    viewmodelRef[dataKey][nameKey] = equipped[weaponName].Skin.Name
+                elseif viewmodelRef.Data then
+                    viewmodelRef.Data.Skin = equipped[weaponName].Skin
+                    viewmodelRef.Data.Name = equipped[weaponName].Skin.Name
+                end
+            end
+        end)
+        local result
+        pcall(function() result = originalCreateViewModel(self, viewmodelRef) end)
+        constructingWeapon = nil
+        return result or viewmodelRef
+    end
+end
+
+local viewModelModule = player.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem:FindFirstChild("ClientViewModel")
+if viewModelModule then
+    local ClientViewModel = require(viewModelModule)
+    if ClientViewModel.GetWrap then
+        local originalGetWrap = ClientViewModel.GetWrap
+        ClientViewModel.GetWrap = function(self)
+            local weaponName = self.ClientItem and self.Name
+            local weaponPlayer = self.ClientItem and self.ClientItem.ClientFighter and self.ClientItem.ClientFighter.Player
+            if weaponName and weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Wrap then
+                return equipped[weaponName].Wrap
+            end
+            return originalGetWrap(self)
+        end
+    end
+    local originalNew = ClientViewModel.new
+    ClientViewModel.new = function(replicatedData, clientItem)
+        local weaponPlayer = clientItem.ClientFighter and clientItem.ClientFighter.Player
+        local weaponName = constructingWeapon or clientItem.Name
+        if weaponPlayer == player and equipped[weaponName] then
+            local ReplicatedClass = require(ReplicatedStorage.Modules.ReplicatedClass)
+            local dataKey = ReplicatedClass:ToEnum("Data")
+            replicatedData[dataKey] = replicatedData[dataKey] or {}
+            local cosmetics = equipped[weaponName]
+            if cosmetics.Skin then replicatedData[dataKey][ReplicatedClass:ToEnum("Skin")] = cosmetics.Skin end
+            if cosmetics.Wrap then replicatedData[dataKey][ReplicatedClass:ToEnum("Wrap")] = cosmetics.Wrap end
+            if cosmetics.Charm then replicatedData[dataKey][ReplicatedClass:ToEnum("Charm")] = cosmetics.Charm end
+        end
+        local result = originalNew(replicatedData, clientItem)
+        if weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Wrap and result._UpdateWrap then
+            result:_UpdateWrap()
+            task.delay(0.1, function() if not result._destroyed then result:_UpdateWrap() end end)
+        end
+        return result
+    end
+end
+
+local originalGetViewModelImage = ItemLibrary.GetViewModelImageFromWeaponData
+ItemLibrary.GetViewModelImageFromWeaponData = function(self, weaponData, highRes)
+    if not weaponData then return originalGetViewModelImage(self, weaponData, highRes) end
+    local weaponName = weaponData.Name
+    local shouldShowSkin = (weaponData.Skin and equipped[weaponName] and weaponData.Skin == equipped[weaponName].Skin) or (viewingProfile == player and equipped[weaponName] and equipped[weaponName].Skin)
+    if shouldShowSkin and equipped[weaponName] and equipped[weaponName].Skin then
+        local skinInfo = self.ViewModels[equipped[weaponName].Skin.Name]
+        if skinInfo then return skinInfo[highRes and "ImageHighResolution" or "Image"] or skinInfo.Image end
+    end
+    return originalGetViewModelImage(self, weaponData, highRes)
+end
+
+pcall(function()
+    local ViewProfile = require(player.PlayerScripts.Modules.Pages.ViewProfile)
+    if ViewProfile and ViewProfile.Fetch then
+        local originalFetch = ViewProfile.Fetch
+        ViewProfile.Fetch = function(self, targetPlayer)
+            viewingProfile = targetPlayer
+            return originalFetch(self, targetPlayer)
+        end
+    end
+end)
+
+local ClientEntity
+pcall(function() ClientEntity = require(player.PlayerScripts.Modules.ClientReplicatedClasses.ClientEntity) end)
+if ClientEntity and ClientEntity.ReplicateFromServer then
+    local originalReplicateFromServer = ClientEntity.ReplicateFromServer
+    ClientEntity.ReplicateFromServer = function(self, action, ...)
+        if action == "FinisherEffect" then
+            local args = {...}
+            local killerName = args[3]            
+            local decodedKiller = killerName
+            if type(killerName) == "userdata" and EnumLibrary and EnumLibrary.FromEnum then
+                local ok, decoded = pcall(EnumLibrary.FromEnum, EnumLibrary, killerName)
+                if ok and decoded then decodedKiller = decoded end
+            end            
+            local isOurKill = tostring(decodedKiller) == player.Name or tostring(decodedKiller):lower() == player.Name:lower()            
+            if isOurKill and lastUsedWeapon and equipped[lastUsedWeapon] and equipped[lastUsedWeapon].Finisher then
+                local finisherData = equipped[lastUsedWeapon].Finisher
+                local finisherEnum = finisherData.Enum                
+                if not finisherEnum and EnumLibrary then
+                    local ok, result = pcall(EnumLibrary.ToEnum, EnumLibrary, finisherData.Name)
+                    if ok and result then finisherEnum = result end
+                end                
+                if finisherEnum then
+                    args[1] = finisherEnum
+                    return originalReplicateFromServer(self, action, unpack(args))
+                end
+            end
+        end        
+        return originalReplicateFromServer(self, action, ...)
+    end
+end
+]=]
+            loadstring(scriptString)()
+            Library:Notify("스킨 언락 완료! (중복 실행 방지 적용됨)", 3)
+        end)
+    end)
+end)
+
+-- [Settings Tab]
+local MenuBox = Tabs.Settings:AddLeftGroupbox('Menu')
+MenuBox:AddLabel('Menu Keybind'):AddKeyPicker('MenuKeybind', { Default = 'RightShift', NoUI = true, Text = 'Menu keybind' })
+
+local Toggles = Library.Toggles or getgenv().Toggles or _G.Toggles or {}
+local Options = Library.Options or getgenv().Options or _G.Options or {}
+
+if Options and Options.MenuKeybind then
+    Library.ToggleKeybind = Options.MenuKeybind
+end
+
+-- ════════════════════════════════════════════════════════════
+-- 3. [보존된 핵심 로직] 사일런트 에임 & 에임봇
+-- ════════════════════════════════════════════════════════════
+local currentTarget = nil
+local isAiming = false
+
+UIS.InputBegan:Connect(function(i, gp) if not gp and i.UserInputType == Enum.UserInputType.MouseButton2 then isAiming = true end end)
+UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton2 then isAiming = false end end)
+
+local function getClosest()
+    local isWallbang = Toggles and Toggles.Wallbang and Toggles.Wallbang.Value
+    local silentFOV = Options.SilentFOV and Options.SilentFOV.Value or 150
+    local target, closestDist = nil, isWallbang and math.huge or silentFOV
+    
+    local center = Camera.ViewportSize / 2
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        pcall(function()
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                if p.Team ~= nil and LocalPlayer.Team ~= nil and p.Team == LocalPlayer.Team then return end
+
+                if isWallbang and hrp then
+                    local dist = (hrp.Position - p.Character.Head.Position).Magnitude
+                    if dist < closestDist then 
+                        closestDist = dist 
+                        target = p.Character.Head 
+                    end
+                else
+                    local pos, onScreen = Camera:WorldToViewportPoint(p.Character.Head.Position)
+                    if onScreen then
+                        local dist = (center - Vector2.new(pos.X, pos.Y)).Magnitude
+                        if dist < silentFOV and dist < closestDist then 
+                            closestDist = dist 
+                            target = p.Character.Head 
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    return target
+end
+
+-- 에임봇 전용: 거리에 상관없이 화면에서 마우스와 가장 가까운 적 100% 락온
+local function getClosestForAimbot()
+    local target, closestDist = nil, math.huge
+    local mPos = UIS:GetMouseLocation()
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        pcall(function()
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                if p.Team ~= nil and LocalPlayer.Team ~= nil and p.Team == LocalPlayer.Team then return end
+                
+                local pos, onScreen = Camera:WorldToViewportPoint(p.Character.Head.Position)
+                if onScreen then
+                    local dist = (mPos - Vector2.new(pos.X, pos.Y)).Magnitude
+                    if dist < closestDist then 
+                        closestDist = dist 
+                        target = p.Character.Head 
+                    end
+                end
+            end
+        end)
+    end
+    return target
+end
+
+local function isSafeScript()
+    local cScript = getcallingscript()
+    if not cScript then return true end
+    local name = cScript.Name
+    -- 핵심 모듈은 우회, 나머지는 허용
+    if name == "CameraModule" or name == "ControlModule" or name == "TransparencyController" then return false end
+    return true
+end
+
+task.spawn(function()
+    pcall(function()
+        local oldIndex
+        oldIndex = hookmetamethod(game, "__index", function(self, key)
+            if Toggles and Toggles.SilentEnable and Toggles.SilentEnable.Value and currentTarget and not checkcaller() then
+                if self == Mouse and (key == "Hit" or key == "Target") then
+                    if isSafeScript() then return key == "Hit" and currentTarget.CFrame or currentTarget end
+                end
+            end
+            
+            -- [마우스 커서 증발 방지 보호막]
+            if not checkcaller() and self == UIS and (key == "MouseIconEnabled" or key == "MouseBehavior") then
+                return oldIndex(self, key)
+            end
+            
+            return oldIndex(self, key)
+        end)
+
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            if checkcaller() then return oldNamecall(self, ...) end
+            local method = getnamecallmethod()
+            local args = {...}
+            
+            -- UI 변수가 로드되지 않았을 때 생기는 오류 방지 (안전한 선언)
+            local silentEnabled = Toggles and Toggles.SilentEnable and Toggles.SilentEnable.Value
+            local wallbangEnabled = Toggles and Toggles.Wallbang and Toggles.Wallbang.Value
+            
+            if (silentEnabled or wallbangEnabled) and currentTarget then
+                if isSafeScript() then
+                    local speedMult = Options.BulletSpeed and Options.BulletSpeed.Value or 1
+
+                    if method == "Raycast" and self == workspace then
+                        local origin = args[1]
+                        local direction = args[2]
+                        if origin and direction and typeof(direction) == "Vector3" then
+                            -- 매직 불릿 핵심: 상대방 정면에서 내리꽂는 판정 (Front Desync)
+                            if wallbangEnabled then
+                                local dist = Options.DesyncDist and Options.DesyncDist.Value or 3
+                                local rootPart = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
+                                local lookVec = rootPart and rootPart.CFrame.LookVector or Vector3.new(0,0,1)
+                                args[1] = currentTarget.Position + (lookVec * dist)
+                            end
+                            -- 사일런트 에임 및 속도 보정 (헤드 정중앙 타격)
+                            local targetPos = currentTarget.Position
+                            args[2] = (targetPos - args[1]).Unit * (direction.Magnitude * speedMult)
+                            return oldNamecall(self, unpack(args))
+                        end
+                    elseif (method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist") and self == workspace then
+                        local ray = args[1]
+                        if ray and typeof(ray) == "Ray" then
+                            local origin = ray.Origin
+                            local direction = ray.Direction
+                            local newOrigin = origin
+                            
+                            if wallbangEnabled then
+                                local dist = Options.DesyncDist and Options.DesyncDist.Value or 3
+                                local rootPart = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
+                                local lookVec = rootPart and rootPart.CFrame.LookVector or Vector3.new(0,0,1)
+                                newOrigin = currentTarget.Position + (lookVec * dist)
+                            end
+                            
+                            local targetPos = currentTarget.Position
+                            local newDirection = (targetPos - newOrigin).Unit * (direction.Magnitude * speedMult)
+                            args[1] = Ray.new(newOrigin, newDirection)
+                            return oldNamecall(self, unpack(args))
+                        end
+                    end
+                end
+            end
+            return oldNamecall(self, ...)
+        end)
+    end)
+end)
+
+local fovCircle
+pcall(function()
+    if Drawing then
+        fovCircle = Drawing.new("Circle")
+        fovCircle.Visible = false
+        fovCircle.Color = Color3.new(1, 1, 1)
+        fovCircle.Thickness = 1
+        fovCircle.NumSides = 64
+        fovCircle.Filled = false
+    end
+end)
+
+local lastShot = 0
+RunService.RenderStepped:Connect(function()
+    pcall(function()
+        -- FOV Circle 그리기 로직
+        if fovCircle then
+            if Toggles and Toggles.DrawFOV and Toggles.DrawFOV.Value then
+                fovCircle.Position = Camera.ViewportSize / 2
+                fovCircle.Radius = Options.SilentFOV.Value
+                fovCircle.Color = Options.FOVColor.Value
+                fovCircle.Visible = true
+            else
+                fovCircle.Visible = false
+            end
+        end
+
+        currentTarget = getClosest()
+        local aimTarget = getClosestForAimbot()
+        
+        -- Aimbot (정확도 100% 강제 스냅: 히트스캔에 맞춰 예측 삭제)
+        if Toggles and Toggles.AimEnable and Toggles.AimEnable.Value and aimTarget then
+            if (not Toggles.AimRightClick.Value) or (Toggles.AimRightClick.Value and isAiming) then
+                -- 라이벌은 대부분 즉발(Hitscan)이므로 예측(Prediction)을 삭제하고 바로 머리에 꽂음
+                local pos, onScreen = Camera:WorldToViewportPoint(aimTarget.Position)
+                if onScreen then
+                    local mPos = UIS:GetMouseLocation()
+                    
+                    -- 부드러움(Smooth) 없이 가장 빠르고 정확하게 오차 0%로 강제 이동
+                    local deltaX = (pos.X - mPos.X)
+                    local deltaY = (pos.Y - mPos.Y)
+                    
+                    if mousemoverel then mousemoverel(deltaX, deltaY) end
+                end
+            end
+        end
+        
+        -- 지능형 스마트 레이지봇 (마구잡이 발사 금지 & 벽 뒤 투시 판별)
+        if Toggles and Toggles.RageEnable and Toggles.RageEnable.Value and currentTarget then
+            local isWallbang = Toggles.Wallbang and Toggles.Wallbang.Value
+            local isVisible = false
+            
+            -- 월뱅(매직불릿)이 꺼져있다면 벽에 막혀있는지 실제 광선으로 확인
+            if not isWallbang then
+                local origin = Camera.CFrame.Position
+                local targetHead = currentTarget.Parent:FindFirstChild("Head") or currentTarget
+                local dir = (targetHead.Position - origin).Unit * 1000
+                local params = RaycastParams.new()
+                params.FilterDescendantsInstances = {LocalPlayer.Character, currentTarget.Parent}
+                params.FilterType = Enum.RaycastFilterType.Exclude
+                local hit = workspace:Raycast(origin, dir, params)
+                if not hit then isVisible = true end -- 벽에 안 막히고 타겟이 보일 때만!
+            else
+                isVisible = true -- 월뱅 모드일 땐 벽 무시하고 쏨
+            end
+            
+            if isVisible then
+                if tick() - lastShot > 0.015 then -- 레이지봇 사격 속도 상향
+                    if mouse1click then mouse1click() end
+                    lastShot = tick()
+                end
+            end
+        end
+        
+        -- Rapid Fire (최고 속도)
+        if Toggles and Toggles.RapidEnable and Toggles.RapidEnable.Value and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            if tick() - lastShot > 0.01 then
+                if mouse1click then mouse1click() end
+                lastShot = tick()
+            end
+        end
+
+        -- [마우스 커서 먹통/화면 안움직임 현상 방지]
+        pcall(function()
+            if not isAiming then
+                if UIS.MouseIconEnabled == false then UIS.MouseIconEnabled = true end
+            end
+        end)
+    end)
+end)
+
+-- [Perfect Magic Wallbang Desync Logic (보이드 낙하 완벽 방지 & 화면 유지)]
+local RealCFrame = nil
+local RealVelocity = nil
+
+-- 물리 엔진(Physics)이 계산되기 직전에 내 캐릭터를 "적의 머리 위(안전지대)"로 순간이동시켜 서버를 속입니다.
+-- 내 화면을 그리는 카메라(RenderStepped)가 돌기 직전에 다시 원래 자리로 돌려놔서 내 화면은 흔들리지 않고 자유롭게 움직일 수 있습니다.
+RunService.Heartbeat:Connect(function()
+    pcall(function()
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if Toggles and Toggles.Wallbang and Toggles.Wallbang.Value and currentTarget and hrp then
+            -- 1. 진짜 위치 및 속도 저장 (내가 걷고 있는 상태 유지)
+            RealCFrame = hrp.CFrame
+            RealVelocity = hrp.AssemblyLinearVelocity
+            
+            -- 2. 서버에 전송할 가짜 위치 (벽에 끼지 않도록 무조건 적 머리 위 공중으로 설정)
+            local targetPos = currentTarget.Position
+            local dist = Options.DesyncDist and Options.DesyncDist.Value or 5
+            
+            local fakePos = targetPos + Vector3.new(0, dist, 0)
+            hrp.CFrame = CFrame.new(fakePos, targetPos)
+            
+            -- 3. 허공에서 물리 엔진 때문에 바닥으로 추락하는 것을 방지 (중력 캔슬)
+            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end
+    end)
+end)
+
+RunService:BindToRenderStep("RestoreDesyncPerfect", 150, function()
+    pcall(function()
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        -- 4. 카메라와 로컬 조작이 업데이트 되기 전에 완벽하게 내 원래 위치로 복원
+        if hrp and RealCFrame then
+            hrp.CFrame = RealCFrame
+            if RealVelocity then hrp.AssemblyLinearVelocity = RealVelocity end
+            RealCFrame = nil
+            RealVelocity = nil
+        end
+    end)
+end)
+-- ════════════════════════════════════════════════════════════
+-- 4. 무적 방어형 ㅈㄴ 많은 ESP (에러 절대 안남)
+-- ════════════════════════════════════════════════════════════
+local espData = {}
+local function addESP(p)
+    task.spawn(function()
+        local box, hpBg, hpBar, hpText, nameText, distText, tracer
+        pcall(function()
+            if Drawing then
+                box = Drawing.new("Square"); box.Visible = false; box.Color = Color3.new(1, 1, 1); box.Thickness = 1; box.Filled = false
+                hpBg = Drawing.new("Square"); hpBg.Visible = false; hpBg.Color = Color3.new(0, 0, 0); hpBg.Thickness = 1; hpBg.Filled = true
+                hpBar = Drawing.new("Square"); hpBar.Visible = false; hpBar.Color = Color3.new(0, 1, 0); hpBar.Thickness = 1; hpBar.Filled = true
+                hpText = Drawing.new("Text"); hpText.Visible = false; hpText.Center = true; hpText.Outline = true; hpText.Color = Color3.new(1, 1, 1); hpText.Size = 13
+                nameText = Drawing.new("Text"); nameText.Visible = false; nameText.Center = true; nameText.Outline = true; nameText.Color = Color3.new(1, 1, 1); nameText.Size = 13
+                distText = Drawing.new("Text"); distText.Visible = false; distText.Center = true; distText.Outline = true; distText.Color = Color3.new(1, 1, 1); distText.Size = 13
+                tracer = Drawing.new("Line"); tracer.Visible = false; tracer.Color = Color3.new(1, 1, 1); tracer.Thickness = 1
+            end
+        end)
+        
+        if box and hpBg then
+            espData[p] = { Box = box, HpBg = hpBg, HealthBar = hpBar, HealthText = hpText, NameText = nameText, DistText = distText, Tracer = tracer, Skeleton = {} }
+            local bones = {{"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"}, {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"Head", "Torso"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"}, {"Torso", "Left Leg"}, {"Torso", "Right Leg"}}
+            for _, b in pairs(bones) do 
+                pcall(function() 
+                    if Drawing then table.insert(espData[p].Skeleton, {b[1], b[2], Drawing.new("Line")}) end
+                end) 
+            end
+        end
+    end)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then addESP(p) end end
+Players.PlayerAdded:Connect(addESP)
+Players.PlayerRemoving:Connect(function(p)
+    if espData[p] then
+        pcall(function()
+            espData[p].Box:Remove(); espData[p].HpBg:Remove(); espData[p].HealthBar:Remove(); espData[p].HealthText:Remove()
+            espData[p].NameText:Remove(); espData[p].DistText:Remove(); espData[p].Tracer:Remove()
+            for _, s in pairs(espData[p].Skeleton) do s[3]:Remove() end
+        end)
+        espData[p] = nil
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    for p, d in pairs(espData) do
+        local isAlive = false
+        local c = p.Character
+        local root, head, rootPos, boxSize, boxPos, top, bottom, height, width
+        
+        -- 안정성 극강 V14 렌더링 검사 (절대 안 터지는 방식)
+        pcall(function()
+            if c and c:FindFirstChild("Humanoid") and c.Humanoid.Health > 0 then
+                root = c:FindFirstChild("HumanoidRootPart")
+                head = c:FindFirstChild("Head")
+                if root and head then
+                    local rPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                    if onScreen then
+                        isAlive = true
+                        rootPos = rPos
+                        local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                        local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+                        height = math.abs(headPos.Y - legPos.Y)
+                        width = height * 0.6 
+                        boxSize = Vector2.new(width, height)
+                        boxPos = Vector2.new(rootPos.X - width / 2, headPos.Y)
+                        top = {Y = headPos.Y}
+                        bottom = {Y = legPos.Y}
+                    end
+                else
+                    -- 만약 R6나 특이 관절이라 Head가 없으면 Torso로 대체
+                    local torso = c:FindFirstChild("Torso") or c:FindFirstChild("UpperTorso")
+                    if torso then
+                        local rPos, onScreen = Camera:WorldToViewportPoint(torso.Position)
+                        if onScreen then
+                            isAlive = true
+                            rootPos = rPos
+                            local headPos = Camera:WorldToViewportPoint(torso.Position + Vector3.new(0, 1.5, 0))
+                            local legPos = Camera:WorldToViewportPoint(torso.Position - Vector3.new(0, 2.5, 0))
+                            height = math.abs(headPos.Y - legPos.Y)
+                            width = height * 0.6 
+                            boxSize = Vector2.new(width, height)
+                            boxPos = Vector2.new(rootPos.X - width / 2, headPos.Y)
+                            top = {Y = headPos.Y}
+                            bottom = {Y = legPos.Y}
+                        end
+                    end
+                end
+            end
+        end)
+        
+        -- 각각의 ESP 기능을 독립적으로 실행 (하나 에러나도 다른거 정상 작동)
+        if isAlive then
+            pcall(function()
+                if Toggles and Toggles.ESPBox and Toggles.ESPBox.Value then 
+                    d.Box.Size = boxSize; d.Box.Position = boxPos; d.Box.Visible = true 
+                else d.Box.Visible = false end
+            end)
+            
+            pcall(function()
+                if Toggles and Toggles.ESPHealth and Toggles.ESPHealth.Value then
+                    local maxH = math.max(c.Humanoid.MaxHealth, 1)
+                    local h = math.clamp(c.Humanoid.Health / maxH, 0, 1)
+                    d.HpBg.Size = Vector2.new(4, height); d.HpBg.Position = Vector2.new(boxPos.X - 6, boxPos.Y); d.HpBg.Visible = true
+                    local barHeight = height * h
+                    d.HealthBar.Size = Vector2.new(2, barHeight); d.HealthBar.Position = Vector2.new(boxPos.X - 5, boxPos.Y + (height - barHeight))
+                    d.HealthBar.Color = Color3.fromHSV(h*0.33, 1, 1); d.HealthBar.Visible = true
+                    d.HealthText.Text = tostring(math.floor(c.Humanoid.Health)); d.HealthText.Position = Vector2.new(boxPos.X - 25, boxPos.Y + (height - barHeight) - 6); d.HealthText.Visible = true
+                else d.HpBg.Visible = false; d.HealthBar.Visible = false; d.HealthText.Visible = false end
+            end)
+            
+            pcall(function()
+                if Toggles and Toggles.ESPName and Toggles.ESPName.Value then
+                    d.NameText.Text = p.Name; d.NameText.Position = Vector2.new(boxPos.X + width/2, top.Y - 15); d.NameText.Visible = true
+                else d.NameText.Visible = false end
+            end)
+            
+            pcall(function()
+                if Toggles and Toggles.ESPDistance and Toggles.ESPDistance.Value then
+                    local dist = math.floor((Camera.CFrame.Position - root.Position).Magnitude)
+                    d.DistText.Text = tostring(dist) .. "m"; d.DistText.Position = Vector2.new(boxPos.X + width/2, bottom.Y + 2); d.DistText.Visible = true
+                else d.DistText.Visible = false end
+            end)
+            
+            pcall(function()
+                if Toggles and Toggles.ESPTracer and Toggles.ESPTracer.Value then
+                    d.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y); d.Tracer.To = Vector2.new(rootPos.X, bottom.Y); d.Tracer.Visible = true
+                else d.Tracer.Visible = false end
+            end)
+            
+            pcall(function()
+                if Toggles and Toggles.ESPSkeleton and Toggles.ESPSkeleton.Value then
+                    for _, s in pairs(d.Skeleton) do
+                        local p1, p2 = c:FindFirstChild(s[1]), c:FindFirstChild(s[2])
+                        if p1 and p2 then
+                            local v1, o1 = Camera:WorldToViewportPoint(p1.Position); local v2, o2 = Camera:WorldToViewportPoint(p2.Position)
+                            if o1 and o2 then s[3].From, s[3].To, s[3].Visible, s[3].Color = Vector2.new(v1.X, v1.Y), Vector2.new(v2.X, v2.Y), true, Color3.new(1,1,1) else s[3].Visible = false end
+                        else s[3].Visible = false end
+                    end
+                else for _, s in pairs(d.Skeleton) do s[3].Visible = false end end
+            end)
+            
+            -- Chams Logic
+            pcall(function()
+                if Toggles and Toggles.ESPChams then
+                    local highlight = c:FindFirstChild("AntiHubChams")
+                    if Toggles.ESPChams.Value then
+                        if not highlight then
+                            highlight = Instance.new("Highlight")
+                            highlight.Name = "AntiHubChams"
+                            highlight.FillColor = Color3.new(1, 0, 0)
+                            highlight.OutlineColor = Color3.new(1, 1, 1)
+                            highlight.FillTransparency = 0.5
+                            highlight.Parent = c
+                        end
+                    else
+                        if highlight then highlight:Destroy() end
+                    end
+                end
+            end)
+        else
+            pcall(function()
+                d.Box.Visible, d.HpBg.Visible, d.HealthBar.Visible, d.HealthText.Visible = false, false, false, false
+                d.NameText.Visible = false; d.DistText.Visible = false; d.Tracer.Visible = false
+                for _, s in pairs(d.Skeleton) do s[3].Visible = false end 
+            end)
+        end
+    end
+end)
+
+-- ════════════════════════════════════════════════════════════
+-- 5. 추가 유틸리티 (이속, 점프, 무기 스킨 등) - 최적화 완료
+-- ════════════════════════════════════════════════════════════
+local bodyParts = { ["Head"]=true, ["Torso"]=true, ["Left Arm"]=true, ["Right Arm"]=true, ["Left Leg"]=true, ["Right Leg"]=true, ["HumanoidRootPart"]=true, ["UpperTorso"]=true, ["LowerTorso"]=true, ["LeftUpperArm"]=true, ["LeftLowerArm"]=true, ["LeftHand"]=true, ["RightUpperArm"]=true, ["RightLowerArm"]=true, ["RightHand"]=true, ["LeftUpperLeg"]=true, ["LeftLowerLeg"]=true, ["LeftFoot"]=true, ["RightUpperLeg"]=true, ["RightLowerLeg"]=true, ["RightFoot"]=true }
+local lastSkinUpdate = 0
+
+RunService.Stepped:Connect(function()
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            
+            -- WalkSpeed & JumpPower
+            if hum then
+                if Toggles and Toggles.WalkSpeedEnable and Toggles.WalkSpeedEnable.Value then
+                    hum.WalkSpeed = Options.WalkSpeedValue.Value
+                end
+                if Toggles and Toggles.JumpPowerEnable and Toggles.JumpPowerEnable.Value then
+                    hum.UseJumpPower = true
+                    hum.JumpPower = Options.JumpPowerValue.Value
+                end
+            end
+            
+            -- Noclip (최적화 버전)
+            if Toggles and Toggles.NoclipEnable and Toggles.NoclipEnable.Value then
+                for _, v in pairs(char:GetChildren()) do
+                    if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
+                end
+                -- 만약 머리나 토르소가 여전히 충돌하면 추가 처리
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp then hrp.CanCollide = false end
+            end
+            
+            -- 외부 최적화 스킨 체인저로 대체됨
+        end
+    end)
+end)
+
+-- 무한 점프 이벤트
+UIS.JumpRequest:Connect(function()
+    pcall(function()
+        if Toggles and Toggles.InfJumpEnable and Toggles.InfJumpEnable.Value then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end)
+end)
+
+-- 플라이 엔진
+RunService.RenderStepped:Connect(function()
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            if Toggles and Toggles.FlyEnable and Toggles.FlyEnable.Value then
+                local bv = hrp:FindFirstChild("AntiHubFly")
+                if not bv then
+                    bv = Instance.new("BodyVelocity")
+                    bv.Name = "AntiHubFly"
+                    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+                    bv.Parent = hrp
+                end
+                
+                local moveDir = Vector3.new()
+                if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
+                
+                bv.Velocity = moveDir * Options.FlySpeed.Value
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then bv.Velocity = bv.Velocity + Vector3.new(0, Options.FlySpeed.Value, 0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then bv.Velocity = bv.Velocity - Vector3.new(0, Options.FlySpeed.Value, 0) end
+            else
+                local bv = hrp:FindFirstChild("AntiHubFly")
+                if bv then bv:Destroy() end
+            end
+        end
+    end)
+end)
+
+-- ════════════════════════════════════════════════════════════
+-- 6. 시스템, 테마 & 설정 저장
+-- ════════════════════════════════════════════════════════════
+task.spawn(function()
+    pcall(function()
+        SaveManager:SetLibrary(Library)
+        ThemeManager:SetLibrary(Library)
+        SaveManager:IgnoreThemeSettings()
+        ThemeManager:SetFolder('AntiHub')
+        SaveManager:SetFolder('AntiHub/Configs')
+        
+        ThemeManager:ApplyToTab(Tabs.Settings)
+        SaveManager:BuildConfigSection(Tabs.Settings)
+    end)
+end)
+
+-- ════════════════════════════════════════════════════════════
+-- [여기가 추가된 부분!] 7. 안티 에임 (기존 코드 미수정)
+-- ════════════════════════════════════════════════════════════
+local AA_Section = Tabs.Combat:AddLeftGroupbox('Animation Anti-Aim')
+
+AA_Section:AddToggle('AAEnable', { Text = '안티 에임 활성화', Default = false })
+AA_Section:AddDropdown('AAMode', { Text = '애니메이션 모드', Default = 'Helicopter', Values = {'Helicopter', 'Spider', 'Breakdance', 'Headless', 'Exorcist'} })
+AA_Section:AddSlider('AASpeed', { Text = '애니메이션 속도', Default = 15, Min = 1, Max = 100, Rounding = 0 })
+
+task.spawn(function()
+    RunService.Stepped:Connect(function()
+        pcall(function()
+            if not Toggles.AAEnable or not Toggles.AAEnable.Value then return end
+            
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChild("Humanoid")
+            if not hrp or not hum or hum.Health <= 0 then return end
+
+            local mode = Options.AAMode.Value
+            local speed = Options.AASpeed.Value
+            local t = tick() * speed
+
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("Motor6D") and v.Name ~= "RootJoint" then
+                    if mode == 'Helicopter' then
+                        v.C0 = v.C0 * CFrame.Angles(0, math.rad(speed), 0)
+                    elseif mode == 'Spider' then
+                        v.C0 = v.C0:Lerp(CFrame.new(0, math.sin(t)*0.5, 0) * CFrame.Angles(math.sin(t), 0, math.cos(t)), 0.1)
+                    elseif mode == 'Breakdance' then
+                        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(speed), 0)
+                        v.C0 = v.C0 * CFrame.Angles(math.random(-10,10)/50, 0, math.random(-10,10)/50)
+                    elseif mode == 'Headless' then
+                        if v.Name == "Neck" or v.Name == "Head" then
+                            v.C0 = CFrame.new(0, -2, 0) * CFrame.Angles(math.rad(90), 0, 0)
+                        end
+                    elseif mode == 'Exorcist' then
+                        if v.Name == "Waist" or v.Name == "Root" then
+                            v.C0 = v.C0:Lerp(CFrame.Angles(math.rad(160), math.sin(t), 0), 0.1)
+                        end
+                    end
+                end
+            end
+        end)
+    end)
+end)
