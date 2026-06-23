@@ -1,0 +1,448 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local mouse = player:GetMouse()
+
+local Rayfield
+for i = 1, 3 do
+    local ok, result = pcall(function()
+        return loadstring(game:HttpGet("https://sirius.menu/rayfield", true))()
+    end)
+    if ok and result then
+        Rayfield = result
+        break
+    end
+    task.wait(1)
+end
+
+if not Rayfield then
+    warn("[Korea Hub] Rayfield 로드 실패")
+    return
+end
+
+local Window = Rayfield:CreateWindow({
+   Name = "🇰🇷 코리아 허브 (Korea Hub) v1.3",
+   LoadingTitle = "KOREA HUB PROJECT v1.3",
+   LoadingSubtitle = "by Korea GG",
+   ConfigurationSaving = {Enabled = false},
+   KeySystem = false,
+   Theme = {
+      TextColor = Color3.fromRGB(25, 35, 45),
+      Background = Color3.fromRGB(245, 252, 255),
+      Topbar = Color3.fromRGB(180, 225, 255),
+      Shadow = Color3.fromRGB(190, 220, 240),
+      NotificationBackground = Color3.fromRGB(250, 253, 255),
+      NotificationActionsBackground = Color3.fromRGB(225, 242, 255),
+      TabBackground = Color3.fromRGB(235, 248, 255),
+      TabStroke = Color3.fromRGB(190, 225, 245),
+      TabBackgroundSelected = Color3.fromRGB(185, 225, 255),
+      TabTextColor = Color3.fromRGB(60, 80, 95),
+      SelectedTabTextColor = Color3.fromRGB(15, 35, 55),
+      ElementBackground = Color3.fromRGB(255, 255, 255),
+      ElementBackgroundHover = Color3.fromRGB(235, 248, 255),
+      SecondaryElementBackground = Color3.fromRGB(245, 252, 255),
+      ElementStroke = Color3.fromRGB(190, 225, 245),
+      SecondaryElementStroke = Color3.fromRGB(210, 235, 250),
+      SliderBackground = Color3.fromRGB(215, 240, 255),
+      SliderProgress = Color3.fromRGB(135, 205, 250),
+      SliderStroke = Color3.fromRGB(120, 195, 245),
+      ToggleBackground = Color3.fromRGB(240, 250, 255),
+      ToggleEnabled = Color3.fromRGB(135, 205, 250),
+      ToggleDisabled = Color3.fromRGB(210, 225, 235),
+      ToggleEnabledStroke = Color3.fromRGB(115, 190, 240),
+      ToggleDisabledStroke = Color3.fromRGB(185, 205, 220),
+      ToggleEnabledOuterStroke = Color3.fromRGB(170, 220, 250),
+      ToggleDisabledOuterStroke = Color3.fromRGB(215, 230, 240),
+      DropdownSelected = Color3.fromRGB(235, 248, 255),
+      DropdownUnselected = Color3.fromRGB(255, 255, 255),
+      InputBackground = Color3.fromRGB(255, 255, 255),
+      InputStroke = Color3.fromRGB(190, 225, 245),
+      PlaceholderColor = Color3.fromRGB(120, 150, 170)
+   }
+})
+
+local function SafeRun(name, fn)
+    local ok, err = pcall(fn)
+    if not ok then
+        warn("[Korea Hub 오류] " .. tostring(name) .. " : " .. tostring(err))
+    end
+end
+
+local function SafeNotify(title, content, duration)
+    pcall(function()
+        Rayfield:Notify({Title = title, Content = content, Duration = duration or 2})
+    end)
+end
+
+local function GetChar()
+    return player.Character or player.CharacterAdded:Wait()
+end
+
+local function GetHumanoid()
+    local char = player.Character
+    if not char then return nil end
+    return char:FindFirstChildOfClass("Humanoid")
+end
+
+local function GetRoot()
+    local char = player.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+end
+
+local InfiniteJumpEnabled = false
+local NoclipEnabled = false
+local FullBrightEnabled = false
+local AntiAfkEnabled = false
+local AntiKnockbackEnabled = false
+local ClickTpEnabled = false
+local SavedPosition = nil
+
+RunService.RenderStepped:Connect(function()
+    if FullBrightEnabled then
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = false
+    end
+end)
+
+player.Idled:Connect(function()
+    if AntiAfkEnabled then
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    local char = player.Character
+    if not char then return end
+
+    if NoclipEnabled then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    end
+
+    if AntiKnockbackEnabled then
+        local hrp = GetRoot()
+        if hrp then
+            for _, v in pairs(hrp:GetChildren()) do
+                if v:IsA("BodyVelocity") or v:IsA("BodyGyro") or v:IsA("BodyPosition") or v:IsA("BodyThrust") or v:IsA("LinearVelocity") then
+                    v:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+local function SendChat(msg)
+    pcall(function()
+        if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            local channels = TextChatService:FindFirstChild("TextChannels")
+            local channel = channels and (channels:FindFirstChild("RBXGeneral") or channels:FindFirstChild("General"))
+            if channel then
+                channel:SendAsync(msg)
+            end
+        else
+            local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+            local say = chatEvents and chatEvents:FindFirstChild("SayMessageRequest")
+            if say then
+                say:FireServer(msg, "All")
+            end
+        end
+    end)
+end
+
+SafeRun("HomeTab", function()
+    local HomeTab = Window:CreateTab("홈", 4483362458)
+    HomeTab:CreateSection("📌 정보")
+    HomeTab:CreateLabel("제작자: Korea GG / 틱톡: @jammin857")
+    HomeTab:CreateSection("📋 최종 검토 보고")
+    HomeTab:CreateParagraph({
+        Title = "v1.3 정식 릴리즈",
+        Content = "- 라이벌 이제 된다 얘들아\n"
+    })
+end)
+
+SafeRun("PlayerTab", function()
+    local PlayerTab = Window:CreateTab("플레이어", 4483362458)
+    PlayerTab:CreateSection("🚀 이동 및 감지")
+
+    PlayerTab:CreateButton({Name = "플라이 핵 (Fly GUI)", Callback = function()
+        SafeRun("Fly GUI", function()
+            loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Fly-gui-v3-78856", true))()
+        end)
+    end})
+
+    PlayerTab:CreateButton({Name = "ESP (플레이어 감지)", Callback = function()
+        SafeRun("ESP", function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/cool83birdcarfly02six/UNIVERSALESPLTX/main/README.md", true))()
+        end)
+    end})
+
+    PlayerTab:CreateToggle({Name = "노클립 (벽 통과)", CurrentValue = false, Callback = function(V) NoclipEnabled = V end})
+    PlayerTab:CreateToggle({Name = "무한 점프", CurrentValue = false, Callback = function(V) InfiniteJumpEnabled = V end})
+
+    UserInputService.JumpRequest:Connect(function()
+        if InfiniteJumpEnabled then
+            local hum = GetHumanoid()
+            if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+        end
+    end)
+
+    PlayerTab:CreateSection("⚡ 능력치 조절")
+    local SpeedSlider
+    local JumpSlider
+
+    SpeedSlider = PlayerTab:CreateSlider({
+        Name = "걷기 속도",
+        Range = {16, 500},
+        Increment = 1,
+        CurrentValue = 16,
+        Callback = function(V)
+            local hum = GetHumanoid()
+            if hum then hum.WalkSpeed = V end
+        end
+    })
+
+    JumpSlider = PlayerTab:CreateSlider({
+        Name = "점프 파워",
+        Range = {50, 1000},
+        Increment = 1,
+        CurrentValue = 50,
+        Callback = function(V)
+            local hum = GetHumanoid()
+            if hum then
+                hum.UseJumpPower = true
+                hum.JumpPower = V
+            end
+        end
+    })
+
+    PlayerTab:CreateButton({Name = "🔄 능력치 초기화", Callback = function()
+        local hum = GetHumanoid()
+        if hum then
+            hum.WalkSpeed = 16
+            hum.UseJumpPower = true
+            hum.JumpPower = 50
+        end
+        pcall(function() SpeedSlider:Set(16) end)
+        pcall(function() JumpSlider:Set(50) end)
+        SafeNotify("초기화", "기본 수치로 변경되었습니다.", 1.5)
+    end})
+end)
+
+SafeRun("DanceTab", function()
+    local DanceTab = Window:CreateTab("춤", 4483362458)
+    DanceTab:CreateButton({Name = "춤 1", Callback = function() SendChat("/e dance") end})
+    DanceTab:CreateButton({Name = "춤 2", Callback = function() SendChat("/e dance2") end})
+    DanceTab:CreateButton({Name = "춤 3", Callback = function() SendChat("/e dance3") end})
+    DanceTab:CreateButton({Name = "인사", Callback = function() SendChat("/e wave") end})
+    DanceTab:CreateButton({Name = "웃기", Callback = function() SendChat("/e laugh") end})
+    DanceTab:CreateButton({Name = "지목", Callback = function() SendChat("/e point") end})
+end)
+
+SafeRun("UtilityTab", function()
+    local UtilityTab = Window:CreateTab("유용한 기능", 4483362458)
+    UtilityTab:CreateSection("🎁 특별 기능")
+
+    UtilityTab:CreateButton({Name = "✨ 게임 아이템 가져오기 (무료)", Callback = function()
+        SafeRun("Item Giver", function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/yofriendfromschool1/Sky-Hub-Backup/main/gametoolgiver.lua", true))()
+        end)
+    end})
+
+    UtilityTab:CreateSection("📍 텔레포트")
+    UtilityTab:CreateButton({Name = "🛠️ 텔레포트 툴 받기", Callback = function()
+        local tool = Instance.new("Tool")
+        tool.RequiresHandle = false
+        tool.Name = "Teleport Tool"
+        tool.Activated:Connect(function()
+            local char = GetChar()
+            if mouse and mouse.Hit then
+                char:MoveTo(mouse.Hit.Position + Vector3.new(0, 3, 0))
+            end
+        end)
+        tool.Parent = player:WaitForChild("Backpack")
+        SafeNotify("지급", "인벤토리를 확인하세요!", 2)
+    end})
+
+    UtilityTab:CreateToggle({Name = "클릭 텔레포트 (토글)", CurrentValue = false, Callback = function(V) ClickTpEnabled = V end})
+
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if processed or not ClickTpEnabled then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local char = player.Character
+            if char and mouse and mouse.Hit then
+                char:MoveTo(mouse.Hit.Position + Vector3.new(0, 3, 0))
+            end
+        end
+    end)
+
+    local LocLabel = UtilityTab:CreateLabel("저장된 위치: 없음")
+
+    UtilityTab:CreateButton({Name = "현재 위치 저장", Callback = function()
+        local root = GetRoot()
+        if root then
+            SavedPosition = root.CFrame
+            pcall(function()
+                LocLabel:Set("저장됨: " .. math.floor(SavedPosition.X) .. ", " .. math.floor(SavedPosition.Z))
+            end)
+        end
+    end})
+
+    UtilityTab:CreateButton({Name = "저장된 위치로 이동", Callback = function()
+        local root = GetRoot()
+        if root and SavedPosition then
+            root.CFrame = SavedPosition
+        end
+    end})
+
+    UtilityTab:CreateSection("🛡️ 보호 및 편의")
+    UtilityTab:CreateToggle({Name = "안티 잠수", CurrentValue = false, Callback = function(V) AntiAfkEnabled = V end})
+    UtilityTab:CreateToggle({Name = "넉백 방지", CurrentValue = false, Callback = function(V) AntiKnockbackEnabled = V end})
+    UtilityTab:CreateToggle({Name = "맵 밝게 (풀라이트)", CurrentValue = false, Callback = function(V) FullBrightEnabled = V end})
+end)
+
+SafeRun("RecTab", function()
+    local RecTab = Window:CreateTab("추천 스크립트", 4483362458)
+    RecTab:CreateButton({Name = "Infinite Yield (명령어 핵)", Callback = function()
+        SafeRun("Infinite Yield", function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source", true))()
+        end)
+    end})
+    RecTab:CreateButton({Name = "고스트 허브 (Ghost Hub)", Callback = function()
+        SafeRun("Ghost Hub", function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/tienkhanh11/spicy/refs/heads/main/GhostHub.lua", true))()
+        end)
+    end})
+end)
+
+SafeRun("TrollTab", function()
+    local TrollTab = Window:CreateTab("트롤링", 4483362458)
+    TrollTab:CreateSection("🌀 플링 및 공격")
+
+    TrollTab:CreateButton({Name = "모든사람날리기 (복귀기능)", Callback = function()
+        local hrp = GetRoot()
+        if not hrp then return end
+        local originalLocation = hrp.CFrame
+        SafeNotify("실행", "플링 후 원래 자리로 복귀합니다.", 2)
+
+        for _, target in pairs(Players:GetPlayers()) do
+            if target ~= player and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local tRoot = target.Character.HumanoidRootPart
+                hrp.CFrame = tRoot.CFrame * CFrame.new(0, 0, 1)
+                hrp.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
+                task.wait(0.15)
+            end
+        end
+
+        hrp.CFrame = originalLocation
+        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        SafeNotify("완료", "원래 위치로 복귀했습니다.", 2)
+    end})
+
+    TrollTab:CreateButton({Name = "Fling GUI (스크립트 실행)", Callback = function()
+        SafeRun("Fling GUI", function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Thuan6565/Script/refs/heads/main/FeFlingGui", true))()
+        end)
+    end})
+
+    TrollTab:CreateButton({Name = "클래식 소드 올킬 (친구보호)", Callback = function()
+        SafeRun("Sword Kill GUI", function()
+            local active = false
+            local guiParent = game:GetService("CoreGui")
+            local g = Instance.new("ScreenGui")
+            g.Name = "KoreaHubSwordKill"
+            g.ResetOnSpawn = false
+            g.Parent = guiParent
+
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(0, 140, 0, 40)
+            b.Position = UDim2.new(0.5, -70, 0.85, -20)
+            b.Text = "올킬: OFF"
+            b.BackgroundColor3 = Color3.new(1, 0, 0)
+            b.TextColor3 = Color3.new(1, 1, 1)
+            b.Parent = g
+            pcall(function() b.Draggable = true end)
+
+            b.MouseButton1Click:Connect(function()
+                active = not active
+                b.Text = active and "올킬: ON" or "올킬: OFF"
+                b.BackgroundColor3 = active and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+            end)
+
+            RunService.RenderStepped:Connect(function()
+                if not active then return end
+                local char = player.Character
+                if not char then return end
+                local tool = char:FindFirstChildOfClass("Tool")
+                if not (tool and tool:FindFirstChild("Handle")) then return end
+
+                tool:Activate()
+                for _, op in pairs(Players:GetPlayers()) do
+                    if op ~= player and not player:IsFriendsWith(op.UserId) and op.Character then
+                        for _, p in pairs(op.Character:GetChildren()) do
+                            if p:IsA("BasePart") then
+                                pcall(function()
+                                    firetouchinterest(tool.Handle, p, 0)
+                                    firetouchinterest(tool.Handle, p, 1)
+                                end)
+                            end
+                        end
+                    end
+                end
+            end)
+        end)
+    end})
+end)
+
+SafeRun("OtherTab", function()
+    local OtherTab = Window:CreateTab("다른게임", 4483362458)
+    OtherTab:CreateSection("🏆인기 추천 (99일)")
+    OtherTab:CreateButton({Name = "99일 핵 (foxname)", Callback = function()
+        SafeRun("foxname", function()
+            loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Foxname-65930", true))()
+        end)
+    end})
+    OtherTab:CreateButton({Name = "99일 핵 (Voidware)", Callback = function()
+        SafeRun("Voidware", function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/VapeVoidware/VW-Add/main/nightsintheforest.lua", true))()
+        end)
+    end})
+
+    OtherTab:CreateSection("🔥 장르별 핵")
+    OtherTab:CreateButton({Name = "라이벌 핵 (Rivals)", Callback = function()
+        SafeRun("Rivals", function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/kiciahook/kiciahook/refs/heads/main/loader.luau", true))()
+        end)
+    end})
+    OtherTab:CreateButton({Name = "한국머더 핵 (MM2)", Callback = function()
+        SafeRun("MM2", function()
+            loadstring(game:HttpGet("https://zetrax.cc", true))()
+        end)
+    end})
+    OtherTab:CreateButton({Name = "쓰나미 브레인롯 핵", Callback = function()
+        SafeRun("Brainrot", function()
+            loadstring(game:HttpGet("https://api.luarmor.net/files/v4/loaders/5946add9ab91f1e04cb005346a8b1968.lua", true))()
+        end)
+    end})
+end)
+
+SafeRun("SettTab", function()
+    local SettTab = Window:CreateTab("설정", 4483362458)
+    SettTab:CreateSection("⚙️ 허브 설정")
+    SettTab:CreateButton({Name = "허브 끄기", Callback = function()
+        pcall(function() Rayfield:Destroy() end)
+    end})
+end)
