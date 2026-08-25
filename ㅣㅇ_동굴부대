@@ -1,0 +1,970 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local Teams = game:GetService("Teams")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+local isMobile = UserInputService.TouchEnabled
+
+local FOVMode = "Center"
+local function getAimCenter()
+    if FOVMode == "Center" then
+        return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    else
+        return UserInputService:GetMouseLocation()
+    end
+end
+
+local Detected, Kill
+pcall(function() setthreadidentity(2) end)
+
+for _, v in pairs(getgc(true)) do
+    if type(v) == "table" then
+        local DetectFunc = rawget(v, "Detected")
+        local KillFunc = rawget(v, "Kill")
+    
+        if type(DetectFunc) == "function" and not Detected then
+            Detected = DetectFunc
+            hookfunction(Detected, function() return true end)
+        end
+
+        if rawget(v, "Variables") and rawget(v, "Process") and type(KillFunc) == "function" and not Kill then
+            Kill = KillFunc
+            hookfunction(Kill, function() end)
+        end
+        
+        if pcall(function() return rawget(v, "indexInstance") end) and type(rawget(v, "indexInstance")) == "table" and (rawget(v, "indexInstance"))[1] == "kick" then
+            setreadonly(v, false)
+            v.tvk = { "kick", function() return workspace:WaitForChild("") end }
+        end
+    end
+end
+
+local OldDebugInfo; OldDebugInfo = hookfunction(getrenv().debug.info, newcclosure(function(...)
+    local LevelOrFunc = ...
+    if Detected and LevelOrFunc == Detected then return coroutine.yield(coroutine.running()) end
+    return OldDebugInfo(...)
+end))
+pcall(function() setthreadidentity(7) end)
+
+local AntiArrestEnabled = false
+local function OnChat(plr)
+    plr.Chatted:Connect(function(msg)
+        if not AntiArrestEnabled then return end
+        local command, targetName = msg:match("^[:;]([^%s]+)%s+([^%s]+)")
+        if command and targetName and (command == "영창" or command == "arrest" or command == "체포") then
+            local myName, tn = LocalPlayer.Name:lower(), targetName:lower()
+            if tn == myName or tn == myName:sub(1, #tn) then LocalPlayer:Kick("아 ㅋㅋ 나는 튈거라고옷!") end
+        end
+    end)
+end
+for _, plr in pairs(Players:GetPlayers()) do OnChat(plr) end
+Players.PlayerAdded:Connect(OnChat)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if AntiArrestEnabled then
+            for _, v in ipairs(Players:GetPlayers()) do
+                if v ~= LocalPlayer and v.Character then
+                    for _, x in pairs(v.Character:GetDescendants()) do
+                        if x:IsA("TextLabel") or x:IsA("TextBox") then
+                            local t = x.ContentText or x.Text
+                            if t and t ~= "" then
+                                local tNoSpace = string.gsub(t, "%s+", ""):lower()
+                                local myName = LocalPlayer.Name:lower()
+                                local myDisplayName = LocalPlayer.DisplayName:lower()
+                                if tNoSpace:find(";영창" .. myName) or tNoSpace:find(";영창" .. myDisplayName) then
+                                    LocalPlayer:Kick("아 ㅋㅋ 나는 튈거라고옷!")
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local function getTarget(fovRadius)
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+    
+    local aimCenter = getAimCenter()
+    local cx, cy = aimCenter.X, aimCenter.Y
+    local best, bestDist = nil, fovRadius or math.huge
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer or not p.Character then continue end
+        local hum = p.Character:FindFirstChild("Humanoid")
+        local hrp = p.Character:FindFirstChild("Head") or p.Character:FindFirstChild("HumanoidRootPart")
+        if not hum or hum.Health <= 0 or not hrp then continue end
+
+        local screen, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+        if onScreen then
+            local dist = math.sqrt((screen.X - cx)^2 + (screen.Y - cy)^2)
+            if dist < bestDist then bestDist = dist; best = hrp end
+        end
+    end
+    return best
+end
+
+local cloneref = (cloneref or clonereference or function(i) return i end)
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+local Window = Library:CreateWindow({
+    Title = 'RNX | 동굴부대',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+if Library.Main then
+    local uiScale = Instance.new("UIScale")
+    uiScale.Scale = 0.6
+    uiScale.Parent = Library.Main
+end
+
+local Tabs = {
+    Combat = Window:AddTab('전투'),
+    Visuals = Window:AddTab('시각 효과'),
+    Player = Window:AddTab('플레이어'),
+    Farm = Window:AddTab('파밍'),
+    Auto = Window:AddTab('자동화'),
+    Emote = Window:AddTab('애니메이션 체인지'),
+    Misc = Window:AddTab('기타'),
+    ['UI Settings'] = Window:AddTab('UI 설정')
+}
+
+local HitboxSection = Tabs.Combat:AddLeftGroupbox('히트박스 제어')
+local WeaponSection = Tabs.Combat:AddLeftGroupbox('무기 제어')
+local HitSoundSection = Tabs.Combat:AddRightGroupbox('히트 사운드 체인지')
+local AimSection = Tabs.Combat:AddRightGroupbox('에임 제어')
+
+HitboxSection:AddButton('히트박스 키우기 적용', function()
+    pcall(function()
+        loadstring(game:HttpGet("https://gist.githubusercontent.com/kr9292247aa-droid/774041b587019ca28077a4b3c44f0c15/raw"))()
+        Library:Notify("히트박스 스크립트가 실행되었습니다.", 3)
+    end)
+end)
+
+local InfAmmoEnabled = false
+local NoRecoilEnabled = false
+local RapidFireEnabled = false
+local RapidFireMult = 5
+
+local function applyWeaponMods()
+    for _, t in ipairs(getreg()) do
+        if type(t) == "table" then
+            if rawget(t, "max_ammo") ~= nil or rawget(t, "_orig_max_ammo") ~= nil then
+                if not rawget(t, "_orig_max_ammo") then rawset(t, "_orig_max_ammo", rawget(t, "max_ammo")) end
+                if not rawget(t, "_orig_current_ammo") then rawset(t, "_orig_current_ammo", rawget(t, "current_ammo")) end
+                if not rawget(t, "_orig_reload_time") then rawset(t, "_orig_reload_time", rawget(t, "reload_time")) end
+                
+                if InfAmmoEnabled then
+                    rawset(t, "max_ammo", math.huge) 
+                    rawset(t, "current_ammo", math.huge)
+                    rawset(t, "reload_time", 0)
+                else
+                    rawset(t, "max_ammo", rawget(t, "_orig_max_ammo"))
+                    rawset(t, "current_ammo", rawget(t, "_orig_current_ammo"))
+                    rawset(t, "reload_time", rawget(t, "_orig_reload_time"))
+                end
+            end
+            
+            if rawget(t, "Ammo") ~= nil or rawget(t, "_orig_Ammo") ~= nil then
+                if not rawget(t, "_orig_Ammo") then rawset(t, "_orig_Ammo", rawget(t, "Ammo")) end
+                if InfAmmoEnabled then
+                    rawset(t, "Ammo", math.huge)
+                else
+                    rawset(t, "Ammo", rawget(t, "_orig_Ammo"))
+                end
+            end
+            
+            local sp = rawget(t, "spread")
+            if type(sp) == "table" then 
+                if not rawget(sp, "_orig_min") then rawset(sp, "_orig_min", rawget(sp, "min")) end
+                if not rawget(sp, "_orig_max") then rawset(sp, "_orig_max", rawget(sp, "max")) end
+                
+                if NoRecoilEnabled then
+                    rawset(sp, "min", 0); rawset(sp, "max", 0); rawset(sp, "running", 0) 
+                else
+                    if rawget(sp, "_orig_min") then rawset(sp, "min", rawget(sp, "_orig_min")) end
+                    if rawget(sp, "_orig_max") then rawset(sp, "max", rawget(sp, "_orig_max")) end
+                end
+            end
+            
+            local rc = rawget(t, "recoil")
+            if type(rc) == "table" then 
+                if not rawget(rc, "_orig_rotation") then rawset(rc, "_orig_rotation", rawget(rc, "rotation")) end
+                if NoRecoilEnabled then
+                    rawset(rc, "rotation", 0)
+                    local dir = rawget(rc, "dir")
+                    if type(dir) == "table" then 
+                        if not rawget(dir, "_orig_X") then rawset(dir, "_orig_X", rawget(dir, "X")) end
+                        if not rawget(dir, "_orig_Y") then rawset(dir, "_orig_Y", rawget(dir, "Y")) end
+                        rawset(dir, "X", {0,0}); rawset(dir, "Y", {0,0}) 
+                    end
+                else
+                    if rawget(rc, "_orig_rotation") then rawset(rc, "rotation", rawget(rc, "_orig_rotation")) end
+                    local dir = rawget(rc, "dir")
+                    if type(dir) == "table" then 
+                        if rawget(dir, "_orig_X") then rawset(dir, "X", rawget(dir, "_orig_X")) end
+                        if rawget(dir, "_orig_Y") then rawset(dir, "Y", rawget(dir, "_orig_Y")) end
+                    end
+                end
+            end
+
+            if rawget(t, "fire_delay") or rawget(t, "firerate") or rawget(t, "rpm") or rawget(t, "rate") or rawget(t, "FireRate") or rawget(t, "Cooldown") then
+                for _, key in ipairs({"fire_delay", "firerate", "rpm", "rate", "FireRate", "Cooldown"}) do
+                    local v = rawget(t, key)
+                    if type(v) == "number" or rawget(t, "_orig_"..key) ~= nil then
+                        if not rawget(t, "_orig_"..key) then rawset(t, "_orig_"..key, v) end
+                        if RapidFireEnabled then
+                            if key == "rpm" or key == "rate" or key == "FireRate" then
+                                rawset(t, key, rawget(t, "_orig_"..key) * RapidFireMult)
+                            else
+                                rawset(t, key, rawget(t, "_orig_"..key) / RapidFireMult)
+                            end
+                        else
+                            rawset(t, key, rawget(t, "_orig_"..key))
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while task.wait(2) do
+        if InfAmmoEnabled or NoRecoilEnabled or RapidFireEnabled then applyWeaponMods() end
+    end
+end)
+
+local GodModEnabled = false
+local godModConns = {}
+local blacklist = { ["수갑"] = true, ["Handcuffs"] = true, }
+
+local function applyGodMod(tool)
+    if not tool:IsA("Tool") or blacklist[tool.Name] then return end
+    
+    local module = tool:FindFirstChildWhichIsA("ModuleScript", true)
+    if module then
+        local success, config = pcall(require, module)
+        if not success then return end
+
+        if GodModEnabled then
+            if config.damage then
+                if not config._orig_damage_max then config._orig_damage_max = config.damage.max end
+                if not config._orig_damage_min then config._orig_damage_min = config.damage.min end
+                if not config._orig_damage_headshot then config._orig_damage_headshot = config.damage.headshot end
+                
+                config.damage.max = 2009523
+                config.damage.min = 2009523
+                if config.damage.headshot then config.damage.headshot = 2009523 end
+            end
+            if config.Damage then 
+                if not config._orig_Damage then config._orig_Damage = config.Damage end
+                config.Damage = 2009523 
+            end
+            tool:SetAttribute("Modded", true)
+        else
+            if config.damage then
+                if config._orig_damage_max then config.damage.max = config._orig_damage_max end
+                if config._orig_damage_min then config.damage.min = config._orig_damage_min end
+                if config._orig_damage_headshot then config.damage.headshot = config._orig_damage_headshot end
+            end
+            if config.Damage and config._orig_Damage then 
+                config.Damage = config._orig_Damage 
+            end
+            tool:SetAttribute("Modded", false)
+        end
+    end
+end
+
+local function setupGodModeEvents()
+    for _, conn in ipairs(godModConns) do conn:Disconnect() end
+    godModConns = {}
+
+    table.insert(godModConns, LocalPlayer.Backpack.ChildAdded:Connect(function(child)
+        task.wait(0.1)
+        applyGodMod(child)
+    end))
+
+    table.insert(godModConns, LocalPlayer.CharacterAdded:Connect(function(char)
+        table.insert(godModConns, char.ChildAdded:Connect(function(child)
+            task.wait(0.1)
+            applyGodMod(child)
+        end))
+    end))
+
+    if LocalPlayer.Character then
+        table.insert(godModConns, LocalPlayer.Character.ChildAdded:Connect(function(child)
+            task.wait(0.1)
+            applyGodMod(child)
+        end))
+    end
+end
+
+setupGodModeEvents()
+
+WeaponSection:AddToggle('GodModTgl', {
+    Text = '2009년523딜',
+    Default = false,
+    Callback = function(v)
+        GodModEnabled = v
+        for _, t in pairs(LocalPlayer.Backpack:GetChildren()) do applyGodMod(t) end
+        if LocalPlayer.Character then
+            for _, t in pairs(LocalPlayer.Character:GetChildren()) do applyGodMod(t) end
+        end
+    end
+})
+
+WeaponSection:AddToggle('InfAmmoTgl', { Text = '무한 탄약', Default = false, Callback = function(v) InfAmmoEnabled = v; applyWeaponMods() end })
+WeaponSection:AddToggle('NoRecoilTgl', { Text = '무반동', Default = false, Callback = function(v) NoRecoilEnabled = v; applyWeaponMods() end })
+WeaponSection:AddToggle('RapidFireTgl', { Text = '연사 배속', Default = false, Callback = function(v) RapidFireEnabled = v; applyWeaponMods() end })
+WeaponSection:AddSlider('RapidFireSld', { Text = '연사 배속 설정', Default = 5, Min = 2, Max = 20, Rounding = 0, Callback = function(v) RapidFireMult = v; applyWeaponMods() end })
+
+local hitSoundMode = "기본"
+
+local function updateHitSounds()
+    local targetBody, targetHead
+    if hitSoundMode == "사운드 1 (틱)" then
+        targetBody, targetHead = "rbxassetid://6607113255", "rbxassetid://6607113255"
+    elseif hitSoundMode == "사운드 2 (빡)" then
+        targetBody, targetHead = "rbxassetid://4764109000", "rbxassetid://4764109000"
+    else
+        targetBody, targetHead = "rbxassetid://3748776946", "rbxassetid://8255306220"
+    end
+    
+    for _, v in ipairs(game:GetDescendants()) do
+        if v:IsA("Sound") then
+            if v.SoundId == "rbxassetid://3748776946" or v.SoundId == "rbxassetid://6607113255" or v.SoundId == "rbxassetid://4764109000" then
+                v.SoundId = targetBody
+            elseif v.SoundId == "rbxassetid://8255306220" or v.SoundId == "rbxassetid://6607113255" or v.SoundId == "rbxassetid://4764109000" then
+                v.SoundId = targetHead
+            end
+        end
+    end
+end
+
+game.DescendantAdded:Connect(function(v)
+    if hitSoundMode ~= "기본" and v:IsA("Sound") then
+        task.defer(function()
+            if v.SoundId == "rbxassetid://3748776946" then
+                v.SoundId = (hitSoundMode == "사운드 1 (틱)" and "rbxassetid://6607113255" or "rbxassetid://4764109000")
+            elseif v.SoundId == "rbxassetid://8255306220" then
+                v.SoundId = (hitSoundMode == "사운드 1 (틱)" and "rbxassetid://6607113255" or "rbxassetid://4764109000")
+            end
+        end)
+    end
+end)
+
+HitSoundSection:AddDropdown('HitSoundDrop', {
+    Values = {'기본', '사운드 1 (틱)', '사운드 2 (빡)'},
+    Default = 1,
+    Multi = false,
+    Text = '피격 사운드 선택',
+    Callback = function(v)
+        hitSoundMode = v
+        updateHitSounds()
+    end
+})
+
+local SilentAimEnabled = false
+local TriggerbotEnabled = false
+local ShowFOV = false
+local FOVRadius = 100
+local CurrentTarget = nil
+local isHoldingTouch = false
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        isHoldingTouch = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input, gpe)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isHoldingTouch = false
+    end
+end)
+
+local fovCircle = Drawing.new("Circle")
+fovCircle.Visible = false
+fovCircle.Color = Color3.fromRGB(0, 170, 255)
+fovCircle.Thickness = 2
+fovCircle.Transparency = 1
+fovCircle.Filled = false
+
+RunService.RenderStepped:Connect(function()
+    fovCircle.Visible = ShowFOV
+    if ShowFOV then
+        local aimCenter = getAimCenter()
+        fovCircle.Position = aimCenter
+        fovCircle.Radius = FOVRadius
+    end
+
+    if SilentAimEnabled or TriggerbotEnabled then
+        local aimCenter = getAimCenter()
+        local closestTarget = nil
+        local lowestScore = math.huge 
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        
+        if myRoot then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("Humanoid").Health > 0 then
+                    local head = p.Character.Head
+                    local screenPoint, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        local mouseDistance = (Vector2.new(screenPoint.X, screenPoint.Y) - aimCenter).Magnitude
+                        if mouseDistance <= FOVRadius then
+                            local score = mouseDistance + ((head.Position - myRoot.Position).Magnitude * 0.8)
+                            if score < lowestScore then lowestScore = score; closestTarget = head end
+                        end
+                    end
+                end
+            end
+        end
+        CurrentTarget = closestTarget
+    else
+        CurrentTarget = nil
+    end
+end)
+
+local mt_game = getrawmetatable(game)
+local oldIndex = mt_game.__index
+setreadonly(mt_game, false)
+mt_game.__index = newcclosure(function(self, key)
+    if not checkcaller() and self:IsA("Mouse") and key == "Hit" and SilentAimEnabled and CurrentTarget then
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        if hum and hum.WalkSpeed > 16 then
+            return CFrame.new(CurrentTarget.Position + (CurrentTarget.Velocity * 0.0625))
+        else
+            return CFrame.new(CurrentTarget.Position)
+        end
+    end
+    return oldIndex(self, key)
+end)
+setreadonly(mt_game, true)
+
+local TriggerCooldown = false
+RunService.Heartbeat:Connect(function()
+    if TriggerbotEnabled and not TriggerCooldown and CurrentTarget then
+        local target = Mouse.Target
+        if target and target.Parent and target.Parent:FindFirstChild("Humanoid") and target.Parent.Name ~= LocalPlayer.Name then
+            TriggerCooldown = true
+            VirtualInputManager:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 1)
+            task.wait(0.05)
+            VirtualInputManager:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 1)
+            task.delay(0.1, function() TriggerCooldown = false end)
+        end
+    end
+end)
+
+AimSection:AddToggle('SilentAimTgl', { Text = 'Silent Aim (매직 불릿)', Default = false, Callback = function(v) SilentAimEnabled = v end })
+AimSection:AddToggle('TriggerbotTgl', { Text = 'Triggerbot', Default = false, Callback = function(v) TriggerbotEnabled = v end })
+AimSection:AddToggle('ShowFOVTgl', { Text = 'FOV 원 표시', Default = false, Callback = function(v) ShowFOV = v end })
+AimSection:AddDropdown('FOVModeDrop', {
+    Values = {'가운데 고정', '터치/마우스 따라가기'},
+    Default = 1,
+    Multi = false,
+    Text = 'FOV 원 위치 설정',
+    Callback = function(v)
+        if v == '터치/마우스 따라가기' then FOVMode = 'Mouse' else FOVMode = 'Center' end
+    end
+})
+AimSection:AddSlider('FOVRadiusSld', { Text = 'FOV 반경', Default = 100, Min = 10, Max = 500, Rounding = 0, Callback = function(v) FOVRadius = v end })
+
+local EspSection = Tabs.Visuals:AddLeftGroupbox('ESP 시스템')
+local ChamsSection = Tabs.Visuals:AddRightGroupbox('Chams 시스템')
+local SkySection = Tabs.Visuals:AddLeftGroupbox('스카이박스 변경')
+
+local teamNames = {"전체 (All)"}
+for _, t in pairs(Teams:GetTeams()) do table.insert(teamNames, t.Name) end
+local espTeamFilter = "전체 (All)"
+
+local espEnabled, espBox, espFill, espName, espHealth, espDist, espTracer = false, true, false, true, true, true, false
+local espMaxDist, espTextSize, espBoxThick = 1000, 13, 1
+local espObjs = {}
+
+local function newD(t,p) local d=Drawing.new(t) for k,v in pairs(p) do d[k]=v end return d end
+local function hideO(o) for _,d in pairs(o) do d.Visible=false end end
+local function cleanESP()
+    if getgenv()._espConn then getgenv()._espConn:Disconnect(); getgenv()._espConn=nil end
+    for _,o in pairs(espObjs) do for _,d in pairs(o) do pcall(function()d:Remove()end) end end; espObjs={}
+end
+
+local function startESP()
+    cleanESP()
+    local function addP(p)
+        if p==LocalPlayer then return end
+        espObjs[p]={
+            box   =newD("Square",{Visible=false,Color=Color3.fromRGB(255,60,60),Thickness=1.5,Filled=false}),
+            fill  =newD("Square",{Visible=false,Color=Color3.fromRGB(255,60,60),Filled=true,Transparency=0.7}),
+            name  =newD("Text",  {Visible=false,Color=Color3.new(1,1,1),Size=13,Outline=true,OutlineColor=Color3.new(0,0,0),Center=true}),
+            hbg   =newD("Square",{Visible=false,Color=Color3.fromRGB(30,30,30),Filled=true}),
+            hfg   =newD("Square",{Visible=false,Filled=true}),
+            dist  =newD("Text",  {Visible=false,Color=Color3.fromRGB(180,180,180),Size=11,Outline=true,OutlineColor=Color3.new(0,0,0),Center=true}),
+            tracer=newD("Line",  {Visible=false,Color=Color3.fromRGB(255,200,0),Thickness=1}),
+        }
+    end
+    for _,p in ipairs(Players:GetPlayers()) do addP(p) end
+    Players.PlayerAdded:Connect(addP)
+    Players.PlayerRemoving:Connect(function(p)
+        if espObjs[p] then for _,d in pairs(espObjs[p]) do pcall(function()d:Remove()end) end; espObjs[p]=nil end
+    end)
+    getgenv()._espConn = RunService.RenderStepped:Connect(function()
+        if not espEnabled then for _,o in pairs(espObjs) do hideO(o) end return end
+        local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p==LocalPlayer then continue end
+            local o = espObjs[p]; if not o then continue end
+            
+            if espTeamFilter ~= "전체 (All)" and (p.Team == nil or p.Team.Name ~= espTeamFilter) then
+                hideO(o); continue
+            end
+
+            local char = p.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChild("Humanoid")
+            if not hrp or not hum or hum.Health<=0 then hideO(o); continue end
+            if myHRP and (hrp.Position-myHRP.Position).Magnitude > espMaxDist then hideO(o); continue end
+            local rs,rv = Camera:WorldToViewportPoint(hrp.Position)
+            local ts,_ = Camera:WorldToViewportPoint(hrp.Position+Vector3.new(0,3.2,0))
+            local bs,_ = Camera:WorldToViewportPoint(hrp.Position-Vector3.new(0,3.0,0))
+            if not rv then hideO(o); continue end
+            local h = math.abs(ts.Y-bs.Y); local w = h*0.55; local x = rs.X
+            if espBox then
+                o.box.Visible=true; o.box.Size=Vector2.new(w,h); o.box.Position=Vector2.new(x-w/2,ts.Y); o.box.Thickness=espBoxThick
+            else o.box.Visible=false end
+            if espFill then
+                o.fill.Visible=true; o.fill.Size=Vector2.new(w,h); o.fill.Position=Vector2.new(x-w/2,ts.Y)
+            else o.fill.Visible=false end
+            if espName then
+                o.name.Visible=true; o.name.Text=p.DisplayName; o.name.Position=Vector2.new(x,ts.Y-16); o.name.Size=espTextSize
+            else o.name.Visible=false end
+            if espDist then
+                local dist = myHRP and math.floor((hrp.Position-myHRP.Position).Magnitude) or 0
+                o.dist.Visible=true; o.dist.Text=dist.."m"; o.dist.Position=Vector2.new(x,bs.Y+2)
+            else o.dist.Visible=false end
+            if espHealth then
+                local hp = math.clamp(hum.Health/hum.MaxHealth,0,1)
+                local bx = x-w/2-5
+                o.hbg.Visible=true; o.hbg.Size=Vector2.new(3,h); o.hbg.Position=Vector2.new(bx-1.5,ts.Y)
+                o.hfg.Visible=true; o.hfg.Size=Vector2.new(3,h*hp); o.hfg.Position=Vector2.new(bx-1.5,ts.Y+h*(1-hp))
+                o.hfg.Color = Color3.fromHSV(hp*0.33,1,1)
+            else o.hbg.Visible=false; o.hfg.Visible=false end
+            if espTracer then
+                local vp = Camera.ViewportSize
+                o.tracer.Visible=true; o.tracer.From=Vector2.new(vp.X/2,vp.Y); o.tracer.To=Vector2.new(x,bs.Y); o.tracer.Thickness=espBoxThick
+            else o.tracer.Visible=false end
+        end
+    end)
+end
+
+EspSection:AddDropdown('ESPTeamDrop', {
+    Values = teamNames,
+    Default = 1,
+    Multi = false,
+    Text = 'ESP 대상 팀 선택',
+    Callback = function(v)
+        espTeamFilter = v
+        if chamsEnabled then applyChams() end
+    end
+})
+
+EspSection:AddToggle('ESPTgl', { Text = 'ESP 켜기', Default = false, Callback = function(v) espEnabled = v; if v then startESP() else cleanESP() end end })
+EspSection:AddToggle('ESPBoxTgl', { Text = 'Box', Default = true, Callback = function(v) espBox = v end })
+EspSection:AddToggle('ESPFillTgl', { Text = 'Filled Box', Default = false, Callback = function(v) espFill = v end })
+EspSection:AddToggle('ESPNameTgl', { Text = 'Name', Default = true, Callback = function(v) espName = v end })
+EspSection:AddToggle('ESPHealthTgl', { Text = 'Health Bar', Default = true, Callback = function(v) espHealth = v end })
+EspSection:AddToggle('ESPDistTgl', { Text = 'Distance', Default = true, Callback = function(v) espDist = v end })
+EspSection:AddToggle('ESPTracerTgl', { Text = 'Tracer', Default = false, Callback = function(v) espTracer = v end })
+EspSection:AddSlider('ESPMaxDistSld', { Text = 'Max Distance', Default = 1000, Min = 50, Max = 2000, Rounding = 0, Callback = function(v) espMaxDist = v end })
+
+local chamsHL = {}
+local chamsEnabled, chamsVisOnly, chamsAlpha = false, false, 50
+local function cleanChams() for _,h in pairs(chamsHL) do pcall(function()h:Destroy()end) end; chamsHL={} end
+
+local function applyChams()
+    cleanChams()
+    if not chamsEnabled then return end
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p==LocalPlayer then continue end
+        
+        if espTeamFilter ~= "전체 (All)" and (p.Team == nil or p.Team.Name ~= espTeamFilter) then continue end
+        
+        local char = p.Character; if not char then continue end
+        local h = Instance.new("Highlight")
+        h.FillColor = Color3.fromRGB(255,60,60); h.OutlineColor = Color3.new(1,1,1)
+        h.FillTransparency = 1 - (chamsAlpha/100); h.OutlineTransparency = 0
+        h.DepthMode = chamsVisOnly and Enum.HighlightDepthMode.Occluded or Enum.HighlightDepthMode.AlwaysOnTop
+        h.Adornee = char; h.Parent = char; chamsHL[p] = h
+    end
+end
+
+local function setupChamsForPlayer(p)
+    p.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if chamsEnabled then applyChams() end
+    end)
+end
+for _, p in ipairs(Players:GetPlayers()) do setupChamsForPlayer(p) end
+Players.PlayerAdded:Connect(setupChamsForPlayer)
+
+ChamsSection:AddToggle('ChamsTgl', { Text = 'Chams 켜기', Default = false, Callback = function(v) chamsEnabled = v; applyChams() end })
+ChamsSection:AddToggle('ChamsVisTgl', { Text = 'Visible Only (가려진 것 무시)', Default = false, Callback = function(v) chamsVisOnly = v; applyChams() end })
+ChamsSection:AddSlider('ChamsAlphaSld', { Text = 'Fill Opacity', Default = 50, Min = 0, Max = 100, Rounding = 0, Callback = function(v) chamsAlpha = v; applyChams() end })
+
+SkySection:AddDropdown('SkyboxDrop', {
+    Values = {'기본', '은하수', '마크 구름', '핑크 하늘', '고양이', '밤 (Night)'},
+    Default = 1,
+    Multi = false,
+    Text = '스카이박스 테마',
+    Callback = function(v)
+        local sky = Lighting:FindFirstChildOfClass("Sky")
+
+        if v ~= '밤 (Night)' and not sky then
+            sky = Instance.new("Sky")
+            sky.Name = "Sky"
+            sky.Parent = Lighting
+            Lighting.Ambient = Color3.fromRGB(128, 128, 128)
+            Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+            Lighting.Brightness = 2
+        end
+
+        if v == '기본' then
+            if sky then
+                sky.SkyboxBk = ""
+                sky.SkyboxDn = ""
+                sky.SkyboxFt = ""
+                sky.SkyboxLf = ""
+                sky.SkyboxRt = ""
+                sky.SkyboxUp = ""
+            end
+        elseif v == '은하수' then
+            sky.SkyboxBk = "rbxassetid://15125283003"
+            sky.SkyboxDn = "rbxassetid://15125281008"
+            sky.SkyboxFt = "rbxassetid://15125277539"
+            sky.SkyboxLf = "rbxassetid://15125279325"
+            sky.SkyboxRt = "rbxassetid://15125274388"
+            sky.SkyboxUp = "rbxassetid://15125275800"
+        elseif v == '마크 구름' then
+            sky.SkyboxBk = "rbxassetid://119036375117529"
+            sky.SkyboxDn = "rbxassetid://84998812401842"
+            sky.SkyboxFt = "rbxassetid://109507946512674"
+            sky.SkyboxLf = "rbxassetid://77236287225229"
+            sky.SkyboxRt = "rbxassetid://92034641677956"
+            sky.SkyboxUp = "rbxassetid://89455832517253"
+        elseif v == '핑크 하늘' then
+            sky.SkyboxBk = "rbxassetid://12635309703"
+            sky.SkyboxDn = "rbxassetid://12635311686"
+            sky.SkyboxFt = "rbxassetid://12635312870"
+            sky.SkyboxLf = "rbxassetid://12635313718"
+            sky.SkyboxRt = "rbxassetid://12635315817"
+            sky.SkyboxUp = "rbxassetid://12635316856"
+        elseif v == '고양이' then
+            sky.SkyboxBk = "rbxassetid://80747900"
+            sky.SkyboxDn = "rbxassetid://80747900"
+            sky.SkyboxFt = "rbxassetid://80747900"
+            sky.SkyboxLf = "rbxassetid://80747900"
+            sky.SkyboxRt = "rbxassetid://80747900"
+            sky.SkyboxUp = "rbxassetid://80747900"
+        elseif v == '밤 (Night)' then
+            if sky then sky:Destroy() end
+            Lighting.Ambient = Color3.new(0,0,0)
+            Lighting.OutdoorAmbient = Color3.new(0,0,0)
+            Lighting.Brightness = 0
+        end
+    end
+})
+
+local MoveSection = Tabs.Player:AddLeftGroupbox('Movement')
+local GodSection = Tabs.Player:AddRightGroupbox('God Mode')
+
+local speedEnabled, speedVal = false, 30
+local jumpEnabled, jumpVal = false, 80
+
+RunService.RenderStepped:Connect(function()
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+    if hum then
+        if speedEnabled then hum.WalkSpeed = speedVal end
+        if jumpEnabled then 
+            hum.UseJumpPower = true 
+            hum.JumpPower = jumpVal 
+        end
+    end
+end)
+
+MoveSection:AddToggle('SpeedTgl', { Text = 'Speed', Default = false, Callback = function(v) speedEnabled = v end })
+MoveSection:AddSlider('SpeedSld', { Text = 'Walk Speed', Default = 30, Min = 16, Max = 200, Rounding = 0, Callback = function(v) speedVal = v end })
+MoveSection:AddToggle('JumpTgl', { Text = 'High Jump', Default = false, Callback = function(v) jumpEnabled = v end })
+MoveSection:AddSlider('JumpSld', { Text = 'Jump Power', Default = 80, Min = 50, Max = 300, Rounding = 0, Callback = function(v) jumpVal = v end })
+
+local noclipEnabled = false
+RunService.Stepped:Connect(function()
+    if noclipEnabled and LocalPlayer.Character then
+        for _,p in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+    end
+end)
+MoveSection:AddToggle('NoclipTgl', { Text = 'Noclip (벽 통과)', Default = false, Callback = function(v) noclipEnabled = v end })
+
+local infHealthEnabled = false
+local healPadConn = nil
+
+GodSection:AddToggle('InfHealthTgl', {
+    Text = '무한 체력',
+    Default = false,
+    Callback = function(v)
+        infHealthEnabled = v
+        if infHealthEnabled then
+            local healPad = nil
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and obj.Name == "HealPad" then
+                    healPad = obj
+                    break
+                end
+            end
+            
+            if healPad then
+                Library:Notify("힐패드 포착! 형님의 발밑으로 납치합니다.", 3)
+                healPadConn = RunService.Heartbeat:Connect(function()
+                    local char = LocalPlayer.Character
+                    if char and char:FindFirstChild("HumanoidRootPart") then
+                        healPad.CanCollide = false 
+                        healPad.CFrame = char.HumanoidRootPart.CFrame
+                    end
+                end)
+            else
+                Library:Notify("맵에 HealPad가 없습니다. 라운드가 시작되었는지 확인하십쇼!", 3)
+            end
+        else
+            if healPadConn then
+                healPadConn:Disconnect()
+                healPadConn = nil
+            end
+        end
+    end
+})
+
+local FarmSection = Tabs.Farm:AddLeftGroupbox('재화 및 상태')
+local AutoCookieEnabled = false
+local AutoATMEnabled = false
+
+local function tp(cf)
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    hrp.CFrame = cf; task.wait(0.05); return true
+end
+
+task.spawn(function()
+    while task.wait(1) do
+        if AutoCookieEnabled then
+            pcall(function()
+                local rem = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("IncreaseBread")
+                for i = 1, 8 do if not AutoCookieEnabled then break end; rem:FireServer(i); task.wait(1) end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(2) do
+        if AutoATMEnabled then
+            local folder = workspace:FindFirstChild("World") and workspace.World:FindFirstChild("Scriptable") and workspace.World.Scriptable:FindFirstChild("ATM")
+            if folder then
+                pcall(function()
+                    for _, atm in pairs(folder:GetChildren()) do
+                        if atm.Name == "ATM" then
+                            local part = atm.PrimaryPart or atm:FindFirstChildWhichIsA("BasePart")
+                            if part and tp(part.CFrame + Vector3.new(0,5,0)) then
+                                task.wait(0.1); tp(part.CFrame + Vector3.new(0,3,0))
+                                for _, vv in pairs(atm:GetDescendants()) do
+                                    if vv:IsA("ProximityPrompt") then vv.HoldDuration = 0; vv:InputHoldBegin() task.wait(0.2) vv:InputHoldEnd() end
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+RunService:BindToRenderStep("camLock", Enum.RenderPriority.Camera.Value + 1, function()
+    if AutoATMEnabled then Camera.CFrame = CFrame.new(Camera.CFrame.Position) * CFrame.Angles(math.rad(-60), 0, 0) end
+end)
+
+FarmSection:AddToggle('AutoCookieTgl', { Text = '자동 쿠키 획득', Default = false, Callback = function(v) AutoCookieEnabled = v end })
+FarmSection:AddToggle('AutoATMTgl', { Text = '자동 ATM 털기', Default = false, Callback = function(v) AutoATMEnabled = v end })
+FarmSection:AddButton('워크데이 클리어', function() pcall(function() ReplicatedStorage.Remotes.ClearedWorkday:FireServer("workday_true") end) end)
+FarmSection:AddSlider('WantedLvlSld', { Text = '수배 레벨 적용', Default = 2, Min = 0, Max = 4, Rounding = 0, Callback = function(v) pcall(function() ReplicatedStorage.Remotes.SetWantedLevel:FireServer(v) end) end })
+FarmSection:AddToggle('AFKTgl', { Text = 'AFK 모드', Default = false, Callback = function(v) pcall(function() ReplicatedStorage.Remotes.AFKStatusChanged:FireServer(v) end) end })
+
+local AutoFarmSection = Tabs.Auto:AddLeftGroupbox('이벤트 & 파밍 자동화')
+local AutoWatermelonATMEnabled = false
+
+AutoFarmSection:AddToggle('WatermelonATMTgl', {
+    Text = 'ATM+물뿌리개 자동 획득',
+    Default = false,
+    Callback = function(v)
+        AutoWatermelonATMEnabled = v
+    end
+})
+
+task.spawn(function()
+    while task.wait(1) do
+        if not AutoWatermelonATMEnabled then continue end
+        pcall(function()
+            for i,v in ipairs(workspace.WatermelonEvent.WateringCans:GetChildren()) do
+                if v.Transparency == 1 then continue end
+                if v.Parent then
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, v, true)
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, v, false)
+                end
+            end
+
+            for i,v in ipairs(workspace.World.Scriptable.ATM:GetChildren()) do
+                if v and v.Main and v.Main:IsA("MeshPart") then
+                    if v.Main.Attachment.ParticleEmitter.Enabled then continue end
+                    LocalPlayer.Character:PivotTo(v.Main.CFrame)
+                    task.wait(0.2)
+                    fireproximityprompt(v.Main.Attachment.ProximityPrompt)
+                    task.wait(0.2)
+                end
+            end
+
+            local char = LocalPlayer.Character
+            if char then
+                pcall(char.PivotTo, char, CFrame.new(-495.4549865722656, 203.31044006347656, -283.3954162597656))
+            end
+        end)
+    end
+end)
+
+AutoFarmSection:AddButton('자동 제식', function()
+    pcall(function()
+        loadstring(game:HttpGet("https://gist.githubusercontent.com/EKOHUB-Script/a9702e672e4ab969abacefdd891adadd/raw/"))()
+    end)
+    Library:Notify("자동 제식 스크립트 실행 완료!", 3)
+end)
+
+local EmoteSection = Tabs.Emote:AddLeftGroupbox('애니메이션 체인지 설정')
+
+local currentEmoteSpeed = 1
+local currentAnimTrack = nil
+
+local function stopEmote()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if not hum then return end
+    local animator = hum:FindFirstChildOfClass("Animator")
+    if animator then
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            track:Stop()
+        end
+    end
+    currentAnimTrack = nil
+end
+
+local function playEmote(id)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if not hum then return end
+
+    local animator = hum:FindFirstChildOfClass("Animator")
+    if not animator then
+        animator = Instance.new("Animator")
+        animator.Parent = hum
+    end
+
+    stopEmote()
+
+    local animation = Instance.new("Animation")
+    animation.AnimationId = "rbxassetid://" .. tostring(id)
+    
+    local anim = animator:LoadAnimation(animation)
+    anim.Priority = Enum.AnimationPriority.Action4
+    anim.Looped = true
+    anim:Play()
+    anim:AdjustSpeed(currentEmoteSpeed)
+    
+    currentAnimTrack = anim
+end
+
+EmoteSection:AddSlider('EmoteSpeedSld', { Text = '이모트 속도', Default = 1, Min = 1, Max = 999, Rounding = 0, Callback = function(v) 
+    currentEmoteSpeed = v 
+    if currentAnimTrack then
+        currentAnimTrack:AdjustSpeed(currentEmoteSpeed)
+    end
+end })
+
+EmoteSection:AddButton('이모트 중지', function() stopEmote() end)
+EmoteSection:AddButton('강남스타일', function() playEmote("182435998") end)
+EmoteSection:AddButton('손 흔들기', function() playEmote("128777973") end)
+EmoteSection:AddButton('웃기', function() playEmote("129423131") end)
+EmoteSection:AddButton('양팔들기', function() playEmote("129423030") end)
+EmoteSection:AddButton('댄스', function() playEmote("182491065") end)
+EmoteSection:AddButton('Point', function() playEmote("128853357") end)
+
+local PlayerSectionMisc = Tabs.Misc:AddLeftGroupbox('플레이어 제어')
+local UtilSection = Tabs.Misc:AddRightGroupbox('시스템')
+
+local AntiAimEnabled = false
+local AntiAimType = "Spin"
+local AntiAimSpeed = 10
+local AATime = 0
+
+RunService.RenderStepped:Connect(function(dt)
+    if not AntiAimEnabled then return end
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    AATime = AATime + dt * AntiAimSpeed
+    local pos = hrp.CFrame.Position
+    
+    if AntiAimType == "Spin" then
+        hrp.CFrame = CFrame.new(pos) * CFrame.Angles(0, AATime, 0)
+    elseif AntiAimType == "Jitter" then
+        local flip = (math.floor(AATime * 2) % 2 == 0) and 0 or math.rad(180)
+        local _, cy, _ = hrp.CFrame:ToEulerAnglesYXZ()
+        hrp.CFrame = CFrame.new(pos) * CFrame.Angles(0, cy + flip, 0)
+    end
+end)
+
+PlayerSectionMisc:AddToggle('AntiAimTgl', { Text = 'Anti-Aim', Default = false, Callback = function(v) AntiAimEnabled = v end })
+PlayerSectionMisc:AddDropdown('AntiAimDrop', { Values = {"Spin", "Jitter"}, Default = 1, Multi = false, Text = 'Anti-Aim 타입', Callback = function(v) AntiAimType = v end })
+PlayerSectionMisc:AddSlider('AntiAimSld', { Text = 'Anti-Aim 속도', Default = 10, Min = 1, Max = 50, Rounding = 0, Callback = function(v) AntiAimSpeed = v end })
+
+UtilSection:AddToggle('AntiArrestTgl', { Text = '안티영창', Default = false, Callback = function(v) AntiArrestEnabled = v end })
+UtilSection:AddButton('레이더 팀으로 변경', function() local t = Teams:FindFirstChild("레이더"); if t then LocalPlayer.Team = t; LocalPlayer.TeamColor = t.TeamColor end end)
+
+Library:SetWatermarkVisibility(true)
+Library:SetWatermark('RNX 허브 | 동굴부대')
+Library.KeybindFrame.Visible = false
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({'MenuKeybind'})
+ThemeManager:SetFolder('EkoHub')
+SaveManager:SetFolder('EkoHub/main')
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:BuildColorSection(Tabs['UI Settings'])
+
+Library:Notify("The best vibe coder|EKO and No.1 Gemini", 3)
